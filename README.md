@@ -1,6 +1,6 @@
 # claude-code-tips
 
-claude code plugins, hooks, agents, and resources. all tested
+claude plugins, hooks, agents, and resources.
 
 by [ani potts](https://github.com/anipotts)
 
