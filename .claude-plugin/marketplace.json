@@ -1,0 +1,68 @@
+{
+  "name": "claude-code-tips",
+  "owner": {
+    "name": "Ani Potts",
+    "email": "ani@anipotts.com"
+  },
+  "metadata": {
+    "description": "claude code plugins, hooks, agents, and resources. all tested",
+    "version": "0.1.0"
+  },
+  "plugins": [
+    {
+      "name": "context-handoff",
+      "source": "./plugins/context-handoff",
+      "description": "saves your context before claude compresses it. the one hook everyone needs",
+      "version": "0.1.0",
+      "author": {
+        "name": "Ani Potts"
+      },
+      "keywords": ["context", "handoff", "session", "precompact"],
+      "category": "productivity"
+    },
+    {
+      "name": "panopticon",
+      "source": "./plugins/panopticon",
+      "description": "logs every single tool action to sqlite. know exactly what claude did",
+      "version": "0.1.0",
+      "author": {
+        "name": "Ani Potts"
+      },
+      "keywords": ["logging", "audit", "sqlite", "analytics"],
+      "category": "observability"
+    },
+    {
+      "name": "broadcast",
+      "source": "./plugins/broadcast",
+      "description": "async notifications when claude ships something. slack, discord, wherever — fire and forget",
+      "version": "0.1.0",
+      "author": {
+        "name": "Ani Potts"
+      },
+      "keywords": ["notifications", "async", "slack", "discord"],
+      "category": "notifications"
+    },
+    {
+      "name": "subagent-orchestrator",
+      "source": "./plugins/subagent-orchestrator",
+      "description": "tracks subagent lifecycle and rebalances work when teammates go idle",
+      "version": "0.1.0",
+      "author": {
+        "name": "Ani Potts"
+      },
+      "keywords": ["subagent", "orchestration", "teams", "scheduling"],
+      "category": "orchestration"
+    },
+    {
+      "name": "session-analytics",
+      "source": "./plugins/session-analytics",
+      "description": "tracks session patterns — duration, frequency, time-of-day, which tools you actually use",
+      "version": "0.1.0",
+      "author": {
+        "name": "Ani Potts"
+      },
+      "keywords": ["analytics", "sessions", "patterns", "tracking"],
+      "category": "analytics"
+    }
+  ]
+}

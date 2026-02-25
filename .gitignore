@@ -1,0 +1,8 @@
+content/
+.claude/
+node_modules/
+.DS_Store
+*.pyc
+__pycache__/
+*.egg-info/
+.env

@@ -1,0 +1,32 @@
+{
+  "name": "context-handoff",
+  "version": "0.1.0",
+  "description": "saves your context before claude compresses it. the one hook everyone needs",
+  "author": {
+    "name": "Ani Potts"
+  },
+  "license": "MIT",
+  "hooks": {
+    "PreCompact": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "${CLAUDE_PLUGIN_ROOT}/hooks/context-save.sh"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "${CLAUDE_PLUGIN_ROOT}/hooks/session-state.sh"
+          }
+        ]
+      }
+    ]
+  },
+  "keywords": ["context", "handoff", "session", "precompact"]
+}

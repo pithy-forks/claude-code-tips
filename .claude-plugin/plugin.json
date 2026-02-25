@@ -1,0 +1,28 @@
+{
+  "name": "claude-code-tips",
+  "version": "0.1.0",
+  "description": "claude code plugins, hooks, agents, and resources. all tested",
+  "author": {
+    "name": "Ani Potts",
+    "email": "ani@anipotts.com"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/anipotts/claude-code-tips",
+  "repository": "https://github.com/anipotts/claude-code-tips",
+  "keywords": [
+    "claude-code",
+    "claude-code-plugins",
+    "claude-code-tips",
+    "claude-code-hooks",
+    "mcp-server"
+  ],
+  "commands": ["./commands/", "./skills/"],
+  "agents": [
+    "./agents/code-sweeper.md",
+    "./agents/pr-narrator.md",
+    "./agents/dep-checker.md",
+    "./agents/vibe-check.md",
+    "./agents/test-writer.md"
+  ],
+  "hooks": "./hooks/hooks.json"
+}

@@ -1,0 +1,23 @@
+{
+  "name": "broadcast",
+  "version": "0.1.0",
+  "description": "async notifications when claude ships something. slack, discord, wherever — fire and forget",
+  "author": {
+    "name": "Ani Potts"
+  },
+  "license": "MIT",
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "${CLAUDE_PLUGIN_ROOT}/hooks/broadcast.sh"
+          }
+        ]
+      }
+    ]
+  },
+  "keywords": ["notifications", "async", "slack", "discord", "broadcast"]
+}

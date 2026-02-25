@@ -1,0 +1,13 @@
+{
+  "name": "claude-code-tips",
+  "description": "claude code plugins, hooks, agents, and resources. all tested",
+  "author": "anipotts",
+  "repository": "https://github.com/anipotts/claude-code-tips",
+  "plugins": [
+    "context-handoff",
+    "panopticon",
+    "subagent-orchestrator",
+    "session-analytics",
+    "broadcast"
+  ]
+}
