@@ -1,6 +1,6 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # =============================================================================
-# Rudy Notify — Custom notification routing for Claude Code
+# Notify — Custom notification routing for Claude Code
 # =============================================================================
 # Fires when Claude Code sends a notification (e.g., task complete, waiting
 # for input, error encountered).

@@ -1,69 +1,85 @@
 # claude-code-tips
 
-plugins, hooks, agents, skills, and a comprehensive guide for claude code. all tested.
+plugins, hooks, agents, and a comprehensive guide for claude code. tested across 4,000+ sessions.
 
 by [ani potts](https://github.com/anipotts)
 
-## whats here
+## plugins
 
-| thing | what it does |
+installable via `claude plugin add`:
+
+| plugin | description |
 |---|---|
-| [miner](./plugins/miner/) | flagship plugin. mines every session to sqlite -- echo, scar, gauge, imprint |
-| [handoff](./plugins/handoff/) | saves your context before compression hits |
+| **[miner](./plugins/miner/)** | mines every session to sqlite with FTS5 search. tracks costs, tokens, cache efficiency. four power features: **echo** (solution recall), **scar** (mistake memory), **gauge** (model advisor), **imprint** (stack recall) |
+| [handoff](./plugins/handoff/) | saves context before compression hits — never lose your plan |
 | [broadcast](./plugins/broadcast/) | async notifications when claude ships something |
-| [/sift](./skills/sift.md) | search and analyze your session history via miner.db |
-| [/ledger](./commands/ledger.md) | quick session dashboard -- tokens, costs, tools, projects |
-| [/improve](./skills/improve.md) | CLAUDE.md self-improvement from git history |
-| [/ship](./skills/ship.md), [/sweep](./skills/sweep.md), [/quicktest](./skills/quicktest.md) | workflow skills -- commit+PR, dead code cleanup, run relevant tests |
-| [analyst](./agents/analyst.md), [explorer](./agents/explorer.md), [guardian](./agents/guardian.md) + [5 more](./agents/) | reusable subagent definitions |
-| [hooks](./hooks/) | safety-guard, context-save, knowledge-builder, panopticon |
-| [the guide](./docs/guide.md) | comprehensive claude code guide (beginner to crazy) |
-
-## quick start
-
-install the miner plugin:
 
 ```bash
 claude plugin add anipotts/miner
 ```
 
-or copy a hook:
+## hooks
+
+standalone scripts. copy to `~/.claude/hooks/` and wire up in settings:
+
+| hook | event | description |
+|---|---|---|
+| [safety-guard](./hooks/safety-guard.sh) | PreToolUse | blocks force push, `rm -rf /`, DROP TABLE |
+| [context-save](./hooks/context-save.sh) | PreCompact | saves context to markdown before compression |
+| [panopticon](./hooks/panopticon.sh) | PostToolUse | logs every tool action to sqlite |
+| [knowledge-builder](./hooks/knowledge-builder/) | PostToolUse | builds a codebase knowledge graph as claude explores |
+| [notify](./hooks/notify.sh) | Notification | routes to macOS, Slack, Pushover, ntfy |
 
 ```bash
 cp hooks/safety-guard.sh ~/.claude/hooks/
 ```
 
-add to `~/.claude/settings.json`:
+## skills & commands
 
-```json
-{
-  "hooks": {
-    "PreToolUse": [
-      {
-        "matcher": "Bash",
-        "hooks": [{"type": "command", "command": "~/.claude/hooks/safety-guard.sh"}]
-      }
-    ]
-  }
-}
-```
+drop into `.claude/skills/` or `.claude/commands/`:
+
+| name | description |
+|---|---|
+| [/sift](./skills/sift.md) | search and analyze session history — costs, tools, patterns, FTS5 search |
+| [/ledger](./commands/ledger.md) | quick usage dashboard — tokens, costs, tools, projects |
+| [/improve](./skills/improve.md) | CLAUDE.md self-improvement from git history |
+| [/ship](./skills/ship.md) | stage, commit, push, open a PR |
+| [/sweep](./skills/sweep.md) | find and clean dead code |
+| [/quicktest](./skills/quicktest.md) | run tests for what you're working on |
+| [/stats](./commands/stats.md) | project health — LOC, git activity, test coverage |
+| [/deps](./commands/deps.md) | dependency updates and security audit |
+
+## agents
+
+drop into `.claude/agents/`:
+
+| agent | description |
+|---|---|
+| [analyst](./agents/analyst.md) | deep session analysis — free-form SQL against miner.db |
+| [explorer](./agents/explorer.md) | parallel worktree exploration |
+| [guardian](./agents/guardian.md) | persistent daemon / file watcher |
+| [code-sweeper](./agents/code-sweeper.md) | dead code, unused imports, stale TODOs |
+| [pr-narrator](./agents/pr-narrator.md) | writes PR descriptions from your diff |
+| [dep-checker](./agents/dep-checker.md) | outdated deps, security advisories |
+| [test-writer](./agents/test-writer.md) | edge case tests the original dev missed |
+| [vibe-check](./agents/vibe-check.md) | quick architecture review |
 
 ## the guide
 
-[docs/guide.md](./docs/guide.md) -- a three-tier progressive guide to claude code:
+[docs/guide.md](./docs/guide.md) — a three-tier progressive guide to claude code:
 
-- **beginner** -- install, CLAUDE.md, permissions, settings
-- **intermediate** -- extensibility stack, hooks, plugins, subagents, MCP
-- **claude code crazy** -- miner, headless CLI tools, self-improvement loops, daemons, github actions
+- **beginner** — install, CLAUDE.md, permissions, settings
+- **intermediate** — extensibility stack, hooks, plugins, subagents, MCP
+- **advanced** — miner, headless CLI tools, self-improvement loops, daemons, github actions
 
 ## docs
 
-- [hooks guide](./docs/hooks-guide.md) -- every hook event, tested examples, advanced patterns
-- [plugin creation](./docs/plugin-creation.md) -- plugin.json spec, full walkthrough, marketplace publishing
-- [subagent patterns](./docs/subagent-patterns.md) -- parallel research, scout pattern, worktree isolation, anti-patterns
-- [mcp servers](./docs/mcp-servers.md) -- playwright, context7, building your own
-- [cli tools](./docs/cli-tools.md) -- headless claude as a shell function factory
-- [automation](./docs/automation.md) -- daemons, cron, file watchers, guardian agent
+- [hooks guide](./docs/hooks-guide.md) — every hook event, tested examples, advanced patterns
+- [plugin creation](./docs/plugin-creation.md) — plugin.json spec, full walkthrough, marketplace publishing
+- [subagent patterns](./docs/subagent-patterns.md) — parallel research, scout pattern, worktree isolation
+- [mcp servers](./docs/mcp-servers.md) — playwright, context7, building your own
+- [cli tools](./docs/cli-tools.md) — headless `claude -p` as a shell function factory
+- [automation](./docs/automation.md) — daemons, cron, file watchers, guardian agent
 
 ## license
 

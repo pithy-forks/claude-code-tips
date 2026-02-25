@@ -7,7 +7,7 @@ Claude Code plugins, hooks, agents, skills, and resources. All tested.
 - `plugins/miner/` -- flagship: mines sessions to sqlite (echo, scar, gauge, imprint)
 - `plugins/handoff/` -- context preservation before compaction
 - `plugins/broadcast/` -- async notifications
-- `hooks/` -- standalone hook scripts (safety-guard, panopticon, context-save, knowledge-builder)
+- `hooks/` -- standalone hook scripts (safety-guard, panopticon, context-save, knowledge-builder, notify)
 - `docs/` -- guide, hooks reference, plugin creation, subagent patterns, cli-tools, automation, mcp-servers
 - `agents/` -- analyst, explorer, guardian, code-sweeper, dep-checker, pr-narrator, test-writer, vibe-check
 - `skills/` -- sift, improve, ship, sweep, quicktest
