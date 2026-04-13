@@ -4,6 +4,7 @@ data/*
 !data/stats.json
 handoffs/
 AUDIT.md
+AGENTS.md
 docs/upstream-watcher-design.md
 .claude/*
 !.claude/commands/

@@ -36,5 +36,4 @@ personal claude code setup, open source. hooks, example agents/commands, opinion
 - `handoffs/` is GITIGNORED · never commit, push, or reference handoff files in public docs
 - `content/` is GITIGNORED · personal drafts, never commit
 - `data/` is GITIGNORED · local mining data, never commit
-- course-related dev files live in `handoffs/` and stay local
-- never create handoff/course files outside of `handoffs/`
+- private dev files live in `handoffs/` and stay local

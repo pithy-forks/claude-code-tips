@@ -138,7 +138,7 @@ this repo is a plugin marketplace. check `/.claude-plugin/marketplace.json`. to 
 
 ```bash
 /plugin marketplace add anipotts/claude-code-tips
-/plugin install mine@anipotts
+/plugin install mine@cc
 ```
 
 ## try it

@@ -26,7 +26,6 @@
 - added tests/ to python-check validation
 
 ### infra
-- added handoff prompts for course structure and monetization
 - added .gitleaks.toml for test fixture allowlisting
 
 ## 2026-03-08

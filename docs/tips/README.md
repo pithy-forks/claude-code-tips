@@ -18,3 +18,4 @@ short, standalone claude code tips. each one is a specific technique you can use
 | [subagents](./subagents.md) | agent teams, worktree isolation, when parallel pays off |
 | [mcp integration](./mcp-integration.md) | wire up MCP servers, use them inside sessions |
 | [hooks v2](./hooks-v2.md) | command vs http vs prompt hooks, the async pattern |
+| [monitor](./monitor.md) | event-driven background watching — react to stdout, zero cost when idle |

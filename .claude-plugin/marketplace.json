@@ -10,7 +10,7 @@
   "plugins": [
     {
       "name": "cc",
-      "source": "plugins/cc/",
+      "source": "./plugins/cc",
       "description": "multi-session awareness — see other sessions, file conflict warnings, cross-session messaging",
       "author": { "name": "Ani Potts" },
       "license": "MIT",
@@ -18,7 +18,7 @@
     },
     {
       "name": "mine",
-      "source": "plugins/mine/",
+      "source": "./plugins/mine",
       "description": "mines every claude code session into sqlite. costs, search, patterns, error memory.",
       "author": { "name": "Ani Potts" },
       "license": "MIT",
