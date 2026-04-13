@@ -1,7 +1,7 @@
 name: Competitive Update
 
 # ---------------------------------------------------------------
-# weekly competitive intelligence pipeline.
+# daily competitive intelligence pipeline.
 # merges competitor release checking (from collect_competitive.py)
 # with pricing page comparison into a single workflow.
 #
@@ -9,7 +9,7 @@ name: Competitive Update
 #   - competitor releases: openai/codex, cursor changelog, gemini-cli
 #   - pricing pages: cursor, antigravity, copilot
 #
-# weekly competitor pricing and feature comparison
+# daily competitor pricing and feature comparison
 #
 # cost: ~$0.02-0.05 per run (haiku, stripped text input)
 # tested with: claude code v2.1.94
@@ -17,7 +17,7 @@ name: Competitive Update
 
 on:
   schedule:
-    - cron: '0 12 * * 3'  # every wednesday at 12:00 UTC
+    - cron: '0 12 * * *'  # daily at 12:00 UTC
   workflow_dispatch:
 
 permissions:
