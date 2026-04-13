@@ -4,8 +4,8 @@ name: Official Watcher
 # monitors official claude code sources (releases, changelog, docs)
 # and auto-applies updates to the repo.
 #
-# this is the tier-1 replacement split from upstream-watcher.yml.
-# handles ONLY official sources -- no community or competitor feeds.
+# watches official sources only -- community and competitor feeds
+# are handled by separate workflows.
 #
 # behavior:
 #   - collects official changes via collect_official.py

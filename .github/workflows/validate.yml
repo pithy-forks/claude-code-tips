@@ -266,4 +266,4 @@ jobs:
             echo "All Python files compile cleanly"
           fi
 
-  # pytest removed -- tests live in anipotts/mine now
+  # tests run via plugin-smoke-test workflow
