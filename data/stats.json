@@ -1,1 +1,45 @@
-[]
+[
+  {
+    "date": "2026-04-19",
+    "github": [
+      {
+        "repo": "anipotts/claude-code-tips",
+        "stars": 19,
+        "forks": 3,
+        "open_issues": 9
+      },
+      {
+        "repo": "anipotts/mine",
+        "stars": 1,
+        "forks": 0,
+        "open_issues": 0
+      },
+      {
+        "repo": "anipotts/imessage-mcp",
+        "stars": 5,
+        "forks": 3,
+        "open_issues": 0
+      },
+      {
+        "repo": "anipotts/claudemon",
+        "stars": 4,
+        "forks": 0,
+        "open_issues": 0
+      }
+    ],
+    "npm": [
+      {
+        "package": "imessage-mcp",
+        "weekly": 85,
+        "monthly": 387,
+        "total": 867
+      },
+      {
+        "package": "claudemon-cli",
+        "weekly": 11,
+        "monthly": 524,
+        "total": 524
+      }
+    ]
+  }
+]
