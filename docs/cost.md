@@ -10,6 +10,12 @@ what claude code actually costs, how caching saves 81% of it, and the strategies
 
 most cost discussions are vibes. "it's expensive" or "it's worth it" without data. here are mine.
 
+
+
+### note on monitoring
+
+the `/monitor` tool (v2.1.98+) changes cost dynamics for long-running background processes. stream filters and poll filters emit events only when conditions are met, not on a schedule. idle monitoring costs zero tokens. this reduces the cost of watching test runners, build processes, and deploy status checks compared to `/loop` polling.
+
 ### what i pay
 
 **$200/mo.** Max plan. flat rate. no per-token billing. no surprises.
