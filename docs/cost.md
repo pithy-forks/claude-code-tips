@@ -16,6 +16,10 @@ most cost discussions are vibes. "it's expensive" or "it's worth it" without dat
 
 the `/monitor` tool (v2.1.98+) changes cost dynamics for long-running background processes. stream filters and poll filters emit events only when conditions are met, not on a schedule. idle monitoring costs zero tokens. this reduces the cost of watching test runners, build processes, and deploy status checks compared to `/loop` polling.
 
+
+
+monitor is now a stable feature (v2.1.98+) and is the preferred method for long-running background process watching. it replaces the earlier `/loop` polling pattern for most use cases.
+
 ### what i pay
 
 **$200/mo.** Max plan. flat rate. no per-token billing. no surprises.

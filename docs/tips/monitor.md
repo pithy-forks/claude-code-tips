@@ -8,15 +8,7 @@ shipped april 9 2026. requires v2.1.98+. announced by alistair (claude code team
 
 ## the three modes, compared
 
-before monitor, you had two options for running commands. both had tradeoffs.
-
-| mode | blocks you? | sees intermediate output? | cost when idle |
-|------|-------------|--------------------------|----------------|
-| foreground (`Bash`) | yes — can't do anything else | yes | high (you're stuck) |
-| background (`run_in_background`) | no | no — one notification when done | zero |
-| **monitor** | no | **yes — per event, as it happens** | **zero** |
-
-the background option is fine when you just need a final result. but if you're running 47 tests and test #3 fails, you don't find out until all 47 finish. monitor catches it at test #3 and can start diagnosing immediately.
+shipped april 2026. requires v2.1.98+. now stable across v2.1.98 through v2.1.116+.
 
 ## stream filter vs poll filter
 
