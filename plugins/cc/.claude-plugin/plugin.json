@@ -1,7 +1,7 @@
 {
   "name": "cc",
-  "version": "1.0.0",
-  "description": "Cross-session messaging for Claude Code. Discover peers and send instant messages between parallel sessions.",
+  "version": "1.1.0",
+  "description": "Cross-session messaging plus the time subsystem: realistic CC-time estimates, project-scoped SessionStart timing hints, and calibration skills.",
   "author": { "name": "Ani Potts", "url": "https://github.com/anipotts" },
   "repository": "https://github.com/anipotts/claude-code-tips",
   "license": "MIT",
