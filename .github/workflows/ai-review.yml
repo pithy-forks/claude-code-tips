@@ -30,12 +30,26 @@ jobs:
     name: claude
     runs-on: ubuntu-latest
     if: github.event.pull_request.draft != true
+    continue-on-error: true  # non-blocking; fails quietly if ANTHROPIC_API_KEY is unset
     steps:
       - uses: actions/checkout@v6
         with:
           fetch-depth: 0
 
+      - name: skip if no api key
+        id: guard
+        env:
+          HAS_KEY: ${{ secrets.ANTHROPIC_API_KEY != '' }}
+        run: |
+          if [ "${HAS_KEY}" != "true" ]; then
+            echo "ANTHROPIC_API_KEY unset; skipping claude review. set it in repo settings -> secrets to enable."
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: read rubric
+        if: steps.guard.outputs.skip != 'true'
         id: rubric
         run: |
           {
@@ -45,6 +59,7 @@ jobs:
           } >> "$GITHUB_OUTPUT"
 
       - name: run claude review
+        if: steps.guard.outputs.skip != 'true'
         uses: anthropics/claude-code-action@v1
         with:
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
@@ -65,12 +80,26 @@ jobs:
     name: codex
     runs-on: ubuntu-latest
     if: github.event.pull_request.draft != true
+    continue-on-error: true  # non-blocking; fails quietly if OPENAI_API_KEY is unset
     steps:
       - uses: actions/checkout@v6
         with:
           fetch-depth: 0
 
+      - name: skip if no api key
+        id: guard
+        env:
+          HAS_KEY: ${{ secrets.OPENAI_API_KEY != '' }}
+        run: |
+          if [ "${HAS_KEY}" != "true" ]; then
+            echo "OPENAI_API_KEY unset; skipping codex review. set it in repo settings -> secrets to enable."
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: read rubric
+        if: steps.guard.outputs.skip != 'true'
         id: rubric
         run: |
           {
@@ -80,6 +109,7 @@ jobs:
           } >> "$GITHUB_OUTPUT"
 
       - name: run codex review
+        if: steps.guard.outputs.skip != 'true'
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -128,9 +158,24 @@ jobs:
     name: claude-issue-triage
     runs-on: ubuntu-latest
     if: github.event_name == 'issues'
+    continue-on-error: true
     steps:
       - uses: actions/checkout@v6
+
+      - name: skip if no api key
+        id: guard
+        env:
+          HAS_KEY: ${{ secrets.ANTHROPIC_API_KEY != '' }}
+        run: |
+          if [ "${HAS_KEY}" != "true" ]; then
+            echo "ANTHROPIC_API_KEY unset; skipping issue triage."
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: run claude issue triage
+        if: steps.guard.outputs.skip != 'true'
         uses: anthropics/claude-code-action@v1
         with:
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
