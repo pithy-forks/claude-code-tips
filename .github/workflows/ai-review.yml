@@ -73,9 +73,7 @@ jobs:
 
           # cap diff at ~200k chars to stay well under claude's input ceiling
           if [ ${#diff_body} -gt 200000 ]; then
-            diff_body="${diff_body:0:200000}
-
-[diff truncated at 200k chars]"
+            diff_body="${diff_body:0:200000}"$'\n\n[diff truncated at 200k chars]'
           fi
 
           payload=$(jq -n \
