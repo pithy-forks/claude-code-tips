@@ -2,7 +2,7 @@
 set -euo pipefail
 # tested with: claude code v2.1.118
 # =============================================================================
-# Safety Guard — PreToolUse command blocker
+# Safety Guard: PreToolUse command blocker
 # =============================================================================
 # Intercepts Bash tool calls before execution and blocks dangerous commands.
 # Returns exit code 2 to tell Claude Code to REJECT the tool call.
@@ -51,7 +51,7 @@ fi
 
 # ---------------------------------------------------------------------------
 # rm -rf / or rm -rf ~ (catastrophic filesystem deletion)
-# No trailing $ anchor — catches `rm -rf / && ...` and `rm -rf / foo` too
+# No trailing $ anchor: catches `rm -rf / && ...` and `rm -rf / foo` too
 # ---------------------------------------------------------------------------
 if printf '%s' "$COMMAND" | grep -qiE 'rm\s+(-[a-zA-Z]*r[a-zA-Z]*f|-[a-zA-Z]*f[a-zA-Z]*r)\s+(/|~|\$HOME)(\s|;|&|\||$)'; then
   block "Recursive force delete on root or home directory is not allowed."
@@ -89,5 +89,5 @@ if printf '%s' "$COMMAND" | grep -qiE '(curl|wget)\s+.*\|\s*(sudo\s+)?(bash|sh|z
   block "Piping remote content to a shell is not allowed. Download first, review, then execute."
 fi
 
-# All checks passed — allow the command
+# All checks passed. allow the command
 exit 0

@@ -9,7 +9,7 @@ standalone scripts that plug into claude code's hook system. copy one, wire it u
 | hook | event | what it does |
 |---|---|---|
 | [safety-guard.sh](./safety-guard.sh) | PreToolUse | blocks force push, `rm -rf /`, DROP TABLE, and other dangerous commands |
-| [no-squash.sh](./no-squash.sh) | PreToolUse | blocks squash merges — preserves commit history |
+| [no-squash.sh](./no-squash.sh) | PreToolUse | blocks squash merges, preserves commit history |
 
 ## observability
 

@@ -2,7 +2,7 @@
 set -euo pipefail
 # tested with: claude code v2.1.118
 # =============================================================================
-# Context Save — PreCompact session handoff
+# Context Save: PreCompact session handoff
 # =============================================================================
 # THE most important hook. Fires before Claude Code compresses context,
 # generating a handoff markdown so you never lose your plan or progress.
@@ -72,6 +72,6 @@ When resuming after compaction:
 EOF
 
 # This message gets injected into the conversation after compaction
-echo "Context saved to $HANDOFF — read it to restore your plan and progress."
+echo "Context saved to $HANDOFF. read it to restore your plan and progress."
 
 exit 0

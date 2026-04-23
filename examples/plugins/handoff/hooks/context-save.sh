@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# context-save.sh — PreCompact hook
+# context-save.sh: PreCompact hook
 # Reads the PreCompact payload from stdin, uses transcript_path to extract
 # recent context, and writes a structured handoff file to .claude/handoff.md
 

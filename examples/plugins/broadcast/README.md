@@ -4,7 +4,7 @@
 
 async notifications when claude ships something
 
-fires on `git commit` and `git push` — sends to slack, discord, or any webhook. completely non-blocking, all requests are backgrounded so claude never waits
+fires on `git commit` and `git push`. sends to slack, discord, or any webhook. completely non-blocking, all requests are backgrounded so claude never waits
 
 ## why
 
@@ -20,10 +20,10 @@ export BROADCAST_CHANNEL="#shipped"  # optional
 ```
 
 supports:
-- **slack** — detects `hooks.slack.com` urls automatically
-- **discord** — detects `discord.com` webhook urls
-- **generic** — any url gets a POST with `{message, project, branch}`
-- **macos** — always fires a native notification banner if you're on mac
+- **slack**: detects `hooks.slack.com` urls automatically
+- **discord**: detects `discord.com` webhook urls
+- **generic**: any url gets a POST with `{message, project, branch}`
+- **macos**: always fires a native notification banner if you're on mac
 
 ## install
 

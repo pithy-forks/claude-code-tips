@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# session-state.sh — Stop hook
+# session-state.sh: Stop hook
 # Lighter-weight session state capture on Stop event.
 # Appends to .claude/handoff.md rather than overwriting,
 # so PreCompact data is preserved.

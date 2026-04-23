@@ -4,7 +4,7 @@
 
 watch a background process and react to its output line by line, without blocking anything. the first event-driven tool in claude code.
 
-shipped april 9 2026. requires v2.1.98+. announced by alistair (claude code team) — his tweet hit 127k views bc people have been duct-taping this with tmux and file queues for months.
+shipped april 9 2026. requires v2.1.98+. announced by alistair (claude code team). his tweet hit 127k views bc people have been duct-taping this with tmux and file queues for months.
 
 ## the three modes, compared
 
@@ -14,7 +14,7 @@ shipped april 2026. requires v2.1.98+. now stable and mature across recent versi
 
 monitor has two modes depending on what you're watching.
 
-**stream filter** — for processes that continuously emit output (log tailing, dev servers, test runners). claude writes a script that pipes stdout through a filter. only matching lines become events.
+**stream filter**: for processes that continuously emit output (log tailing, dev servers, test runners). claude writes a script that pipes stdout through a filter. only matching lines become events.
 
 ```
 "start npm run dev and monitor for errors"
@@ -22,7 +22,7 @@ monitor has two modes depending on what you're watching.
 → you keep working. errors stream in as they happen.
 ```
 
-**poll filter** — for things you need to check periodically (APIs, endpoints, deploy status). claude writes a script that polls at an interval and only emits when a condition is met.
+**poll filter**: for things you need to check periodically (APIs, endpoints, deploy status). claude writes a script that polls at an interval and only emits when a condition is met.
 
 ```
 "monitor our health endpoint every 30s, alert if status != 200"
@@ -40,7 +40,7 @@ monitor takes four things:
 |-----------|-------------|
 | `description` | what you're watching and why |
 | `command` | the shell command claude writes to do the watching |
-| `filter` | stream_filter (real-time) or poll_filter (interval-based) — determines what counts as an event |
+| `filter` | stream_filter (real-time) or poll_filter (interval-based): determines what counts as an event |
 | `timeout` / `persistent` | how long to watch, and whether it survives across turns |
 
 you don't configure these manually. tell claude what to watch in plain english and it writes the command + filter. the parameters exist under the hood.
@@ -69,9 +69,9 @@ watching something for hours while you work on other stuff?
 monitor is a bigger deal than it looks. from a tweet reply that got it right:
 
 > "the quiet implication is that claude code is becoming event-driven instead of poll-driven. that's a much bigger primitive than the tool itself. once the agent can react to streams instead of asking 'is it done yet' in a loop, a whole class of long-running workflows opens up."
-> — @jatingargiitk
+> - @jatingargiitk
 
-before monitor, the only way to watch something was `/loop` — which is time-driven. it fires a prompt every N minutes, each iteration is a full API call. monitor is event-driven: the script runs continuously, tokens are consumed only when something actually happens.
+before monitor, the only way to watch something was `/loop`, which is time-driven. it fires a prompt every N minutes, each iteration is a full API call. monitor is event-driven: the script runs continuously, tokens are consumed only when something actually happens.
 
 this also works in the agent SDK, not just the CLI. so if you're building autonomous agents, they can now react to external events natively.
 
@@ -91,9 +91,9 @@ use both: monitor for real-time watching, /loop for scheduled maintenance passes
 
 ## try it
 
-1. start a dev server and watch for errors: `"start npm run dev and use the monitor tool to watch for any errors or warnings while I work on the auth feature"` — then browse your app and trigger a bug. watch claude catch it mid-stream.
+1. start a dev server and watch for errors: `"start npm run dev and use the monitor tool to watch for any errors or warnings while I work on the auth feature"`. then browse your app and trigger a bug. watch claude catch it mid-stream.
 
-2. set up a deploy watcher: `"monitor our vercel deployment logs for the next hour, alert me if error rate spikes above 5 per minute"` — walk away. come back when something breaks.
+2. set up a deploy watcher: `"monitor our vercel deployment logs for the next hour, alert me if error rate spikes above 5 per minute"`. walk away. come back when something breaks.
 
 3. combine with a subagent: spawn one agent to implement a feature, and tell the main session to monitor the test output. the implementer writes code, monitor catches test failures as they happen, and the main session can coordinate.
 
