@@ -1,8 +1,9 @@
 ---
 name: time-benchmark
 description: walk the user through a low/medium/high effort A/B/C throughput benchmark on their current model
+user-invocable: false
 ---
-<!-- tested with: claude code v2.1.94 -->
+<!-- tested with: claude code v2.1.118 -->
 
 # /time-benchmark
 

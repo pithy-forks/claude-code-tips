@@ -2,8 +2,9 @@
 name: time-estimate
 description: estimate CC active time for a task using the time rule, with dynamic effort resolution
 argument-hint: <task description>
+user-invocable: false
 ---
-<!-- tested with: claude code v2.1.94 -->
+<!-- tested with: claude code v2.1.118 -->
 
 # /time-estimate
 

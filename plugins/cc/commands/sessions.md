@@ -1,11 +1,12 @@
 ---
+name: sessions
 description: session mesh for claude code (email-cc semantics). see live sessions, send messages, broadcast status, subscribe to topics
 model: haiku
 ---
 
 Use the `cc` MCP tool. One tool, verb dispatch via the `action` argument.
 
-> On Claude Code v2.1.94+ you can invoke the `cc` MCP tool directly; this slash command is a convenience wrapper that documents the verb surface.
+> On Claude Code v2.1.94+ you can invoke the `cc` MCP tool directly; this slash command is a convenience wrapper that documents the verb surface. Invoke as `/cc:sessions`.
 
 ## verbs and when to use them
 

@@ -14,12 +14,18 @@
 ### versions
 - `plugins/cc/.claude-plugin/plugin.json`, `plugins/cc/server.ts`, and top-level `.claude-plugin/plugin.json` aligned to 2.1.0 to match marketplace metadata
 
+### slash command UX
+- plugin slash command renamed from `/cc:cc` to `/cc:sessions` (removes the ugly duplicate-name form in the slash menu)
+- `time-*` skills marked `user-invocable: false` so they stop cluttering the slash menu; still fully model-callable
+- `/cc:sessions` replaces every example in `plugins/cc/README.md`
+
 ### docs and governance
 - README "what's inside" teaser above the quickstart with a `/cc:time-estimate` example
+- README subtitle rewritten: positioning (patterns battle-tested across yc startups, public tech companies, unicorns) replaces "my claude code setup"; star-CTA removed in favor of "start here" tip links
 - cc README documents namespaced (`/cc:time-*`) as canonical; bare form works when no collision
-- `/cc` slash command: clarified as a documentation wrapper; MCP tool can be invoked directly on CC v2.1.94+
-- em dashes removed from shipped mine plugin files, `plugins/mine/.claude-plugin/plugin.json`, and `CHANGELOG.md`
+- em dashes removed from shipped mine plugin files, `plugins/mine/.claude-plugin/plugin.json`, `CHANGELOG.md`, and `docs/cost.md`
 - added `CONTRIBUTING.md` (PR checklist, test-locally guidance), `SECURITY.md` (private advisory path, known risks), `CODE_OF_CONDUCT.md` (Contributor Covenant v2.1)
+- drafted v3-horizon RFCs in `docs/rfcs/`: `mine-v2-observability.md`, `freshness-watcher.md`, `mini-control-plane.md`
 
 ## 2026-03-15
 
@@ -58,4 +64,4 @@
 - 8 CI workflows for autonomous maintenance
 - standalone hooks: safety-guard, panopticon, context-save, notify
 
-<!-- tested with: claude code v2.1.94+ -->
+<!-- tested with: claude code v2.1.118+ -->
