@@ -81,4 +81,4 @@ edit `.github/workflows/ai-review.yml`:
 - remove the `codex-review` job to stop codex reviews.
 - set the whole workflow to `on: workflow_dispatch` only for manual-only mode.
 
-removing coderabbit entirely: the repo-level `.coderabbit.yaml` disables auto-reviews; full app uninstall is done at [repo settings -> integrations](https://github.com/anipotts/claude-code-tips/settings/installations).
+removing coderabbit entirely: the repo-level `.coderabbit.yaml` disables auto-reviews. full app uninstall is done in github repo settings under integrations -> installed github apps -> coderabbit -> configure -> uninstall. that page is behind auth so no link here.
