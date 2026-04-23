@@ -1,4 +1,4 @@
-<!-- tested with: claude code v2.1.94 -->
+<!-- tested with: claude code v2.1.118 -->
 
 # cost
 
@@ -26,7 +26,7 @@ monitor is now a stable feature (v2.1.98+) and is the preferred method for long-
 
 **$200/mo.** Max plan. flat rate. no per-token billing. no surprises.
 
-that $200 covers everything — hundreds of sessions, thousands of subagent spawns. run `/mine` to see your own numbers.
+that $200 covers everything. hundreds of sessions, thousands of subagent spawns. run `/mine` to see your own numbers.
 
 ### what your plan costs
 
@@ -36,14 +36,14 @@ that $200 covers everything — hundreds of sessions, thousands of subagent spaw
 | max | $200 | flat rate, 20x Pro limits. generous enough that most users won't hit them. |
 | API (pay-per-use) | variable | billed per token. caching saves ~87% on input costs. |
 
-on pro or max, **you don't pay per token.** the mine.db cost estimates are hypothetical — they show what your usage would cost at API list prices, not what you actually pay.
+on pro or max, **you don't pay per token.** the mine.db cost estimates are hypothetical: they show what your usage would cost at API list prices, not what you actually pay.
 
 ### why caching still matters on a flat plan
 
 even though you don't pay per token, caching affects:
-- **speed** — cached prefixes return faster (less compute to process)
-- **rate limits** — fewer tokens consumed per turn = more headroom before throttling
-- **context quality** — stable CLAUDE.md = stable cache prefix = consistent behavior
+- **speed**: cached prefixes return faster (less compute to process)
+- **rate limits**: fewer tokens consumed per turn = more headroom before throttling
+- **context quality**: stable CLAUDE.md = stable cache prefix = consistent behavior
 
 my cache hit rate is 95% overall (83% for short sessions, 96% for long ones).
 
