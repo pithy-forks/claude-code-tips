@@ -22,4 +22,4 @@ short, standalone claude code tips. each one is a specific technique you can use
 | [hooks v2](./hooks-v2.md) | command vs http vs prompt hooks, the async pattern |
 | [monitor](./monitor.md) | watch background processes and react to output in real time |
 
-| [monitor](./monitor.md) | watch background processes and react to output in real time |
+| [monitor](./monitor.md) | watch background processes, react to output in real time (v2.1.98+, now stable) |

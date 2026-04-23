@@ -8,7 +8,7 @@ shipped april 9 2026. requires v2.1.98+. announced by alistair (claude code team
 
 ## the three modes, compared
 
-shipped april 2026. requires v2.1.98+. now stable across v2.1.98 through v2.1.116+.
+shipped april 2026. requires v2.1.98+. now stable and mature across recent versions (v2.1.98-v2.1.118+).
 
 ## stream filter vs poll filter
 
