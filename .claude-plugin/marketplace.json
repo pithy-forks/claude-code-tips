@@ -4,14 +4,14 @@
     "name": "Ani Potts"
   },
   "metadata": {
-    "description": "claude code plugins by ani potts — session awareness, usage mining, and tools.",
-    "version": "2.0.0"
+    "description": "claude code plugins by ani potts: session awareness, usage mining, and tools.",
+    "version": "2.1.0"
   },
   "plugins": [
     {
       "name": "cc",
       "source": "./plugins/cc",
-      "description": "multi-session awareness — see other sessions, file conflict warnings, cross-session messaging",
+      "description": "session mesh for claude code (email-cc semantics): awareness digests, file-overlap alerts, topic subscriptions, cross-session messaging",
       "author": { "name": "Ani Potts" },
       "license": "MIT",
       "category": "collaboration"

@@ -1,10 +1,10 @@
-<!-- tested with: claude code v2.1.94 -->
+<!-- tested with: claude code v2.1.118 -->
 
-# hooks v2: the four handler types
+# hooks v2: the five handler types
 
-hooks come in four flavors. pick the wrong one and you burn tokens, add latency, or silently fail.
+hooks come in five flavors now (v2.1.118 added `mcp_tool`). pick the wrong one and you burn tokens, add latency, or silently fail.
 
-## the four types
+## the five types
 
 | type | what it is | timeout | cost | best for |
 |------|-----------|---------|------|----------|
@@ -12,8 +12,9 @@ hooks come in four flavors. pick the wrong one and you burn tokens, add latency,
 | `http` | POST to a URL, JSON body | 30s | free | external services, webhooks, metrics |
 | `prompt` | single-turn LLM eval | 30s | tokens | nuanced decisions, context-aware checks |
 | `agent` | subagent with full tool access (Read, Grep, Glob) | 60s | expensive | complex decisions that need file reads |
+| `mcp_tool` (v2.1.118) | directly invoke an MCP tool on a connected server | 60s | free (no child process) | hook work that an MCP server already owns the state for |
 
-`command` handles 90%+ of cases. it's the fastest, cheapest, and most predictable. the others exist for when bash can't make the decision alone.
+`command` handles 90%+ of cases. it's the fastest, cheapest, and most predictable. `mcp_tool` is the newest: when your plugin already ships an MCP server with tools, hooks can call those tools directly without a shell shim.
 
 ### command
 
@@ -66,6 +67,33 @@ a full subagent that can read files, grep, glob. the most powerful type and the 
 ```
 
 same event restrictions as prompt hooks. 60s timeout. each invocation spins up its own context window.
+
+### mcp_tool (v2.1.118+)
+
+directly invoke a tool on an already-connected MCP server. no shell child process, no http round-trip. the hook executes inside the running mcp server's process.
+
+```json
+{
+  "type": "mcp_tool",
+  "server": "cc",
+  "tool": "cc",
+  "input": { "action": "check" },
+  "timeout": 5
+}
+```
+
+fields:
+
+- `server`: the mcp server name as configured in the plugin's `mcpServers` block (or user `settings.json`).
+- `tool`: the tool name exposed by that server.
+- `input`: the tool arguments. string values support `${path}` substitution from the hook's stdin payload, e.g. `"file_path": "${tool_input.file_path}"`.
+- `timeout`: seconds, default 60.
+
+return value: whatever the mcp tool returns as text is treated as the hook's stdout. for context-injecting events (SessionStart, UserPromptSubmit, UserPromptExpansion, PreToolUse, PostToolUse, PostToolUseFailure), the returned text is wrapped by claude code into the `{hookSpecificOutput: {hookEventName: ..., additionalContext: "..."}}` envelope and injected. for other events (like SessionEnd), output is logged but not surfaced to the model.
+
+when to reach for mcp_tool: your plugin already ships an MCP server, and some hook work (e.g. reading the session roster, marking an inbox read) is really a tool call in disguise. removing the shell/node shim cuts a child process per hook fire and removes a file that can drift from the server's state model. the `cc` plugin in this repo uses three mcp_tool hooks (SessionStart, UserPromptSubmit, SessionEnd) to talk to its own `cc` server.
+
+one gotcha: SessionStart hooks sometimes fire before the MCP server is fully connected, in which case the call produces a non-blocking error. design the server's own startup to self-bootstrap (don't rely on SessionStart hook success for correctness).
 
 ## the async pattern
 
@@ -140,7 +168,11 @@ SessionStart stdout becomes conversation context. PreToolUse can block (exit 2) 
 
 ## which type i use and why
 
-i run 5 hooks: a security guard (PreToolUse, blocks dangerous commands), a git guard (PreToolUse, enforces clean git workflows), a live stats tracker (PostToolUse), a session sync to my Mac Mini (Stop), and a pulse digest generator (Stop). all command hooks. i tried a prompt-based hook early on for code review gating and it added a few seconds per tool call. not worth it. command hooks with jq parsing are fast enough for every validation i've needed. the only case where i'd reach for a prompt hook is if i needed Claude to make a judgment call ("is this change architecturally safe?") rather than a regex match. start with a command hook on PreToolUse. safety-guard.sh in this repo is a good first hook.
+day-to-day: command hooks handle safety checks, logging, file ops, and session sync. they're fast (sub-50ms with jq), cheap (no tokens), and predictable. prompt hooks cost tokens and latency per fire, and i only reach for them when i genuinely need a judgment call ("is this change architecturally safe?") rather than a regex match. agent hooks are heavier still and reserved for cases that need code context to decide.
+
+mcp_tool hooks (new in v2.1.118) are the right call when my plugin already ships an MCP server and some hook work is literally "call one of my server's tools." the `cc` plugin in this repo is the canonical example: its SessionStart, UserPromptSubmit, and SessionEnd hooks all invoke the `cc` server's `cc` tool with different `action` verbs. no shell shim, no drift between hook code and server state, one fewer child process per hook fire.
+
+start with a command hook on PreToolUse. safety-guard.sh in this repo is a good first hook. consider mcp_tool for any hook whose body is "shell out to call my own MCP server."
 
 ## try it
 

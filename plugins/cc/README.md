@@ -1,76 +1,192 @@
-<!-- tested with: claude code v2.1.94 -->
+<!-- tested with: claude code v2.1.118 -->
 
 # cc
 
-cross-session messaging for claude code. see what other sessions are doing, send messages between them.
+session mesh for claude code. like email cc: every session on your machine
+stays informed of what its siblings are doing, and you see what they're doing,
+so two agents never silently clobber the same file. zero-token when quiet,
+200-400 tokens of real cross-session awareness when active.
+
+also ships the `time` subsystem (a rule, a hook, three `/time-*` skills) from
+the v1 plugin, unchanged.
 
 ## install
 
-```bash
+```
 /plugin marketplace add anipotts/claude-code-tips
 /plugin install cc@cc
 ```
 
-## usage
+zero configuration. works on macos, linux, wsl. needs node 18+.
+
+## quickstart
 
 ```
-/cc                          show active sessions
-/cc send merizo "pause"      message another session
+/cc                                 list other sessions on this machine
+/cc send <name> "hello"             direct message; recipient sees it on next turn
+/cc announce "refactoring auth"     broadcast a status update; peers see it in their digest
+/cc subscribe #auth                 join a topic
+/cc send --topic=#auth "..."        broadcast to topic subscribers
 ```
 
-messages arrive as `<channel source="cc" from="SESSION_NAME">` tags. sessions auto-register on start and clean up on exit.
+## how awareness works (the gmail-cc metaphor)
 
-## how it works
+cc is the email cc line for claude code sessions. you're *informed*, not
+*obligated*. when another session does something relevant, you see it in
+context when you start your next turn. you decide whether to act.
 
-an MCP server (`server.ts`) uses `fs.watch()` for instant message delivery between sessions. each session gets an inbox directory. messages are delivered as files, watched in real-time, and cleaned up after reading.
+every turn fires `UserPromptSubmit`. cc's hook calls the mcp server there,
+which returns an awareness digest: direct messages, topic activity, peers'
+recent file activity, and file-overlap alerts. only new items since your
+last check are surfaced (delta semantics). empty digests are skipped.
+
+the digest looks like:
+
+```
+cc digest (3 other sessions active)
+
+direct:
+- merizo (4m, question) "30d vs 90d refresh?": auth refactor, legal wants shorter window...
+
+topic #auth (2 new):
+- quantercise (3m) "merged 30-day branch"
+
+activity:
+- merizo @ ~/repo-a (src/auth.ts, src/tokens.ts): refactoring session storage [7m]
+- quantercise @ ~/repo-b (lib/deploy/staging.ts): investigating failed CF deploy [12m]
+
+file overlap:
+- src/auth.ts: also touched by merizo within 8m. coordinate via /cc send merizo
+```
+
+active turn cost: ~200-400 tokens. quiet turn cost: 0 tokens.
+
+## verbs
+
+| verb | does |
+|---|---|
+| `sessions` | list live sessions (id, name, cwd, role, topics, recent_files, last_seen) |
+| `send` | direct message or topic broadcast. fields: `to`, `topic`, `message`, `subject`, `urgency` (`low`/`normal`/`urgent`/`question`), `meta` |
+| `announce` | voluntary status broadcast. peers see it in their `check` digest. fields: `summary`, `detail`, `topics` |
+| `check` | awareness digest (structured + rendered). delta-semantics by default; `since_s` forces lookback |
+| `subscribe` | join a topic (e.g. `#auth`). optional `role` tags your session |
+| `unsubscribe` | leave a topic |
+| `cleanup` | deregister self (called by `SessionEnd` hook) |
+| `ask` / `answer` | scaffolded; wired in 2.1.0. use `/cc send` with `urgency: question` for now |
+
+## file-overlap alerts (the killer feature)
+
+the mcp server passively reads your own session transcript and publishes the
+last ~10 files your tools touched into `sessions.db`. when any other session
+has touched a file you've touched within the last ~10 minutes, your next
+digest surfaces an alert. this is what stops two claude code sessions from
+silently clobbering each other's work.
+
+no PostToolUse hook. no extra tokens inside the conversation. the transcript
+read is filesystem-level and never enters your context.
+
+## hooks
+
+| event | calls | why |
+|---|---|---|
+| `SessionStart` | `cc check` (mcp_tool) | inject initial digest; register presence |
+| `UserPromptSubmit` | `cc check` (mcp_tool) | primary awareness surface, before each user turn |
+| `SessionEnd` | `cc cleanup` (mcp_tool) | tombstone session, remove inbox |
+
+three hooks, not four. `Stop` is deliberately not used because claude code
+only injects `additionalContext` on six events, and `Stop` is not one.
+messages arriving during an assistant turn surface on the *next* user
+prompt, which matches the email-cc metaphor (you check email when you check
+email, not mid-keystroke).
+
+all three hooks use `type: "mcp_tool"` from claude code v2.1.118: the hook
+calls the mcp server's `cc` tool directly. no shell shim, no node shim.
+
+## realtime push (tier 2, opt-in)
+
+by default cc is pull-only. if you want inbound direct messages to land
+mid-turn rather than at the next prompt, launch claude with `--channels`:
+
+```bash
+alias claude-cc-live='claude --channels'
+claude-cc-live
+```
+
+trade-off: claude code disables plan mode and `AskUserQuestion` while
+`--channels` is active (per v2.1.117). most users should leave this off
+and stay on tier 1 (pull), where every deferred tool works normally. the
+mcp server supports both modes from the same install; there is no code
+change to switch.
 
 ## structure
 
-- `.claude-plugin/plugin.json`: plugin manifest (MCP server)
-- `server.ts`: MCP server (TypeScript, fs.watch)
-- `hooks/cc-hook.mjs`: session lifecycle (register/cleanup)
-- `hooks/time-project-hint.sh`: SessionStart hook, project-scoped timing hint
-- `hooks/hooks.json`: hook event registrations
-- `commands/cc.md`: `/cc` slash command
-- `rules/time.md`: CC time budgeting rule (bimodal modes, model × effort matrix, 3 tiers of parallelism)
-- `skills/time-estimate/SKILL.md`: `/time-estimate <task>` produces a ranged estimate with dynamic effort resolution
-- `skills/time-calibrate/SKILL.md`: `/time-calibrate` measures your real throughput against the rule (needs `mine` plugin)
-- `skills/time-benchmark/SKILL.md`: `/time-benchmark` walks a low/medium/high A/B/C test on your current model
+```
+plugins/cc/
+├── .claude-plugin/plugin.json
+├── server.ts                       mcp server, 7 verbs + 2 scaffolded
+├── db/
+│   ├── schema.sql                  6 tables: sessions, topics, subs, recent_files, announcements, questions
+│   └── migrate.ts                  opens db, applies schema
+├── lib/
+│   ├── render.ts                   Digest → additionalContext text
+│   └── transcript-tail.ts          watches own transcript, publishes recent_files
+├── hooks/
+│   ├── hooks.json                  3 mcp_tool hooks (SessionStart, UserPromptSubmit, SessionEnd)
+│   └── time-project-hint.sh        SessionStart project-timing hint (time subsystem)
+├── commands/cc.md                  /cc slash command
+├── rules/time.md                   time budgeting rule
+├── skills/time-estimate/           /time-estimate <task>
+├── skills/time-calibrate/          /time-calibrate
+└── skills/time-benchmark/          /time-benchmark
+```
 
-## time
+state at `${CLAUDE_CONFIG_DIR:-~/.claude}/cc/`:
 
-the `time` subsystem turns "how long will this take" into a grounded number. ships three pieces:
+```
+sessions.db            sqlite metadata (wal mode)
+inbox/<sid>/           direct-message files (atomic rename)
+topics/<t>/            topic-message files (atomic rename)
+questions/             2.1.0, scaffolded
+```
 
-- **`rules/time.md`**: a rule auto-loaded into every session. frames CC active time vs your review time, bimodal session modes (quick / standard / marathon), model × effort multipliers, and three tiers of parallelism (main / subagent / teammate).
-- **SessionStart hook**: when you start a session in a git repo, injects a one-line hint like `[cc timing · last 5 sessions in ~/my-proj] avg active: 23.6 min · avg tools: 61 · compaction: 0/5 (0%)`. silent no-op if `~/.claude/mine.db` is absent.
-- **three skills**: `/time-estimate`, `/time-calibrate`, `/time-benchmark`.
+messages bodies stay on filesystem so directory-based delivery still works
+if sqlite is unavailable. metadata is sqlite so concurrent writes from many
+sessions converge safely.
 
-### three skills
+## troubleshooting
 
-| skill | what |
-|---|---|
-| `/time-estimate <task>` | produces a CC-time range with effort-level rung cited, session mode named, your-time for review, confidence, and 2× risks. |
-| `/time-calibrate` | reads `~/.claude/mine.db` (needs `mine` plugin), diffs your real throughput against the rule's matrix, flags drifts >15%. |
-| `/time-benchmark` | guides an A/B/C across `/effort low`, `medium`, `high` on your current model. never auto-switches effort. |
+- **no digest shows up:** check that the plugin is enabled (`/plugin` menu).
+  if your cc state dir didn't exist, it's created on first launch; run any
+  tool that loads the mcp server, then try `/cc`.
+- **"session X not found":** recipient session needs cc enabled and must be
+  live (heartbeat every 30s). use `/cc sessions` to see what's live.
+- **session name shows as 8-char id:** cc pulls the native session name from
+  `~/.claude/sessions/<pid>.json` when available; falls back to `basename(cwd)`
+  otherwise.
+- **plan mode is missing when running `--channels`:** expected. tier 2
+  trade-off. switch back to default `claude` launch for tier 1 behavior.
+- **file-overlap alerts empty even though two sessions are editing the same
+  file:** the transcript-tail watcher needs ~10-15s after a tool call to
+  publish the file path. very fast back-and-forth edits may race.
+- **sqlite database corrupted:** remove `${CLAUDE_CONFIG_DIR:-~/.claude}/cc/sessions.db*`
+  and restart any session; schema is recreated.
 
-### optional settings to pair with this plugin
+## time subsystem
 
-documented here for your convenience. you apply them in your own `~/.claude/settings.json`, the plugin does not write to user settings.
+cc also hosts the `time` subsystem introduced in v1.1.0 (unchanged):
 
-- `"cleanupPeriodDays": 999999`: keep session transcripts so `mine` has data to mine and `/time-calibrate` has history. security caveat: transcripts contain plaintext prompts and outputs; FileVault + sensible filesystem permissions are the usual mitigation.
-- `"effortLevel": "low" | "medium" | "high" | "xhigh"`: sets your default. `/time-estimate` reads this as precedence rung 4.
-- `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1` (env): unlocks the third parallelism tier (agent teammates). see the rule for the speedup/cost trade.
+- `rules/time.md`: cc-time budgeting rule (bimodal modes, model × effort matrix, 3 tiers of parallelism)
+- `hooks/time-project-hint.sh`: `SessionStart` project-scoped timing hint, reads `~/.claude/mine.db` if present
+- `/time-estimate <task>`: produces a ranged estimate with effort-rung cited
+- `/time-calibrate`: diffs your real throughput (needs `mine` plugin)
+- `/time-benchmark`: A/B/C across `/effort low`/`medium`/`high` on your current model
 
-### degradation matrix
+see `rules/time.md` for the full matrix and estimation format.
 
-| missing | what breaks |
-|---|---|
-| `~/.claude/mine.db` | SessionStart timing hint stays silent. `/time-calibrate` prints an install-suggestion screen. rule and `/time-estimate` unaffected. |
-| `jq` | SessionStart hook silently exits 0. other paths unaffected. |
-| `sqlite3` | same: silent exit. |
-| `git` | hook falls back to literal cwd scope instead of repo root. still runs. |
-| `mine` plugin | SessionStart hook still works if `mine.db` exists from an earlier install. `/time-calibrate` needs it for ongoing freshness. |
+## rollback
 
-### rollback
+```
+/plugin uninstall cc
+```
 
-uninstall: `/plugin uninstall cc`. the rule, hook, and three skills go with it. no user-settings changes to reverse.
+no user-settings changes to reverse.
