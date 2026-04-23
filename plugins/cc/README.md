@@ -177,9 +177,11 @@ cc also hosts the `time` subsystem introduced in v1.1.0 (unchanged):
 
 - `rules/time.md`: cc-time budgeting rule (bimodal modes, model × effort matrix, 3 tiers of parallelism)
 - `hooks/time-project-hint.sh`: `SessionStart` project-scoped timing hint, reads `~/.claude/mine.db` if present
-- `/time-estimate <task>`: produces a ranged estimate with effort-rung cited
-- `/time-calibrate`: diffs your real throughput (needs `mine` plugin)
-- `/time-benchmark`: A/B/C across `/effort low`/`medium`/`high` on your current model
+- `/cc:time-estimate <task>`: produces a ranged estimate with effort-rung cited
+- `/cc:time-calibrate`: diffs your real throughput (needs `mine` plugin)
+- `/cc:time-benchmark`: A/B/C across `/effort low`/`medium`/`high` on your current model
+
+skills are namespaced under `cc:`. claude code will accept the bare form (`/time-estimate`) when no other plugin registers the same name; the namespaced form is the canonical one.
 
 see `rules/time.md` for the full matrix and estimation format.
 
