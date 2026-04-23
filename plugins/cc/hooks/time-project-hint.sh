@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# tested with: claude code v2.1.94
+# tested with: claude code v2.1.118
 # SessionStart hook: inject "last 5 sessions in cwd" timing hint.
 # Robust by design: exit 0 on any failure, no external timeout command needed.
 # Uses sqlite3 -readonly + internal busy-timeout + outer hook timeout in hooks.json.

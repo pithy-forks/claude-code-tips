@@ -5,7 +5,7 @@
 # so PreCompact data is preserved.
 
 set -euo pipefail
-# tested with: claude code v2.1.94
+# tested with: claude code v2.1.118
 
 HANDOFF_DIR=".claude"
 HANDOFF_FILE="${HANDOFF_DIR}/handoff.md"
