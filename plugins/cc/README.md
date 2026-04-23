@@ -157,9 +157,9 @@ sessions converge safely.
 
 - **no digest shows up:** check that the plugin is enabled (`/plugin` menu).
   if your cc state dir didn't exist, it's created on first launch; run any
-  tool that loads the mcp server, then try `/cc`.
+  tool that loads the mcp server, then try `/cc:sessions`.
 - **"session X not found":** recipient session needs cc enabled and must be
-  live (heartbeat every 30s). use `/cc sessions` to see what's live.
+  live (heartbeat every 30s). use `/cc:sessions` to see what's live.
 - **session name shows as 8-char id:** cc pulls the native session name from
   `~/.claude/sessions/<pid>.json` when available; falls back to `basename(cwd)`
   otherwise.

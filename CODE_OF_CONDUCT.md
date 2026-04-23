@@ -32,7 +32,7 @@ this code of conduct applies within all project spaces (issues, PRs, discussions
 
 ## enforcement
 
-instances of abusive, harassing, or otherwise unacceptable behavior may be reported by contacting the project maintainer at `ap7564` at `nyu.edu`. all complaints will be reviewed and investigated and will result in a response that is deemed necessary and appropriate to the circumstances.
+instances of abusive, harassing, or otherwise unacceptable behavior may be reported by contacting the project maintainer at ap7564@nyu.edu. all complaints will be reviewed and investigated and will result in a response that is deemed necessary and appropriate to the circumstances.
 
 ## attribution
 

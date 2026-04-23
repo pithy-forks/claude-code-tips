@@ -21,7 +21,7 @@ new dimensions to capture per session, per event, or per tool call (decided case
 - **fast mode**: fast vs normal (user-set or session-inherited).
 - **compaction state**: fresh session, post-compaction, manual-clear.
 - **billing method**: subscription tier (pro / max-5x / max-20x), direct API, Vertex AI, Bedrock, Foundry, enterprise SSO. captured once per session, cached.
-- **feature stack in use**: plugins enabled, MCP servers connected, hooks firing, skills invoked, agents spawned, slash commands used. can be computed as a session-level vector.
+- **feature stack in use**: plugins enabled, MCP servers connected, hooks firing, skills invoked, agents spawned, slash commands used. the stack is captured as a session-level vector.
 - **session -> outcome mapping**: commits made, files changed, PRs opened, tests run, exit reason (user-stop, compact, crash, timeout).
 
 dimensions stay additive. nothing existing gets dropped or renamed.

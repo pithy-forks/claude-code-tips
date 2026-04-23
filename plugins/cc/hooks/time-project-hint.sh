@@ -8,6 +8,7 @@
 exec 2>/dev/null
 
 {
+  set -euo pipefail
   JQ="$(command -v jq || true)"
   SQLITE="$(command -v sqlite3 || true)"
   GIT="$(command -v git || true)"
