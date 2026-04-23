@@ -14,6 +14,13 @@
 ### versions
 - `plugins/cc/.claude-plugin/plugin.json`, `plugins/cc/server.ts`, and top-level `.claude-plugin/plugin.json` aligned to 2.1.0 to match marketplace metadata
 
+### docs and governance
+- README "what's inside" teaser above the quickstart with a `/cc:time-estimate` example
+- cc README documents namespaced (`/cc:time-*`) as canonical; bare form works when no collision
+- `/cc` slash command: clarified as a documentation wrapper; MCP tool can be invoked directly on CC v2.1.94+
+- em dashes removed from shipped mine plugin files, `plugins/mine/.claude-plugin/plugin.json`, and `CHANGELOG.md`
+- added `CONTRIBUTING.md` (PR checklist, test-locally guidance), `SECURITY.md` (private advisory path, known risks), `CODE_OF_CONDUCT.md` (Contributor Covenant v2.1)
+
 ## 2026-03-15
 
 ### mine plugin
