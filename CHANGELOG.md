@@ -27,6 +27,13 @@
 - added `CONTRIBUTING.md` (PR checklist, test-locally guidance), `SECURITY.md` (private advisory path, known risks), `CODE_OF_CONDUCT.md` (Contributor Covenant v2.1)
 - drafted v3-horizon RFCs in `docs/rfcs/`: `mine-v2-observability.md`, `freshness-watcher.md`, `mini-control-plane.md`
 
+### review automation
+- replaces CodeRabbit with an ai-review-team: `anthropics/claude-code-action` (prose, voice, contract shape) plus a codex reviewer (openai responses api, o3-mini) for bugs, security, shell/python correctness
+- canonical rubric at [`.github/AI_REVIEW_RUBRIC.md`](./.github/AI_REVIEW_RUBRIC.md) both reviewers follow: fixed output format (blocking / apply / discuss / dismissed), lane split, and auto-dismiss list for voice-conflicting style nits
+- workflow at [`.github/workflows/ai-review.yml`](./.github/workflows/ai-review.yml) runs on pull_request + issues + workflow_dispatch; concurrency-gated, draft-skipped
+- `.coderabbit.yaml` disables CodeRabbit auto-reviews; full uninstall is a one-click action in repo settings (see [docs/review-process.md](./docs/review-process.md))
+- `docs/review-process.md` explains the contract, secrets required (`ANTHROPIC_API_KEY`, `OPENAI_API_KEY`), and how to turn individual reviewers on or off
+
 ## 2026-03-15
 
 ### mine plugin
