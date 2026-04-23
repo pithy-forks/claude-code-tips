@@ -28,14 +28,14 @@ description: all /mine intents, examples, and setup
 | health | `/mine health` or `/mine stats` |
 | time filter | `/mine this week` or `/mine january` |
 | backfill | `/mine backfill` or `/mine refresh` |
-| watch | `/mine watch` or `/mine every 30 minutes` — scheduled dashboard |
-| freeform | `/mine anything else` — builds a query from your question |
+| watch | `/mine watch` or `/mine every 30 minutes` - scheduled dashboard |
+| freeform | `/mine anything else` - builds a query from your question |
 
 ## scope
 
 `/mine` auto-detects your scope based on the current directory:
-- **project** — if your cwd matches a project in mine.db, defaults to just that project
-- **global** — if no match, shows all projects
+- **project** - if your cwd matches a project in mine.db, defaults to just that project
+- **global** - if no match, shows all projects
 
 say "global" or "project" to switch. the scope shows in the freshness line at the top of every output.
 
@@ -49,4 +49,4 @@ all data comes from `~/.claude/mine.db`, a local sqlite database built from your
 
 ## setup
 
-if you don't have a database yet, just run `/mine` — it'll walk you through setup.
+if you don't have a database yet, just run `/mine` - it'll walk you through setup.

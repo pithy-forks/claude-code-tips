@@ -1,6 +1,6 @@
 ---
 name: mine
-description: your usage data — sessions, costs, tools, projects, search, and patterns
+description: your usage data - sessions, costs, tools, projects, search, and patterns
 tools: Bash, Read, AskUserQuestion, CronCreate, CronDelete, CronList
 ---
 When the user runs /mine, interpret their intent and query ~/.claude/mine.db accordingly.
@@ -67,7 +67,7 @@ Three core intents, plus search and freeform. If no argument is given, show the 
 
 ---
 
-### DASHBOARD (default — no argument, or "status", "overview", "today")
+### DASHBOARD (default - no argument, or "status", "overview", "today")
 
 The answer to "what's happening?" Recent activity, where compute goes, whether sessions are productive.
 
@@ -228,21 +228,21 @@ Format:
 | outcome | what it means | sessions | avg API value | avg active min |
 |---------|---------------|----------|---------------|----------------|
 | shipped | committed code | N | $X | Ym |
-| explored | read-heavy, no mutations — research | N | $X | Ym |
-| burned | wrote files but never committed — effort wasted | N | $X | Ym |
-| worked | mutated files, <20 tool calls — small task | N | $X | Ym |
-| quick | ≤5 tool calls — trivial | N | $X | Ym |
+| explored | read-heavy, no mutations - research | N | $X | Ym |
+| burned | wrote files but never committed - effort wasted | N | $X | Ym |
+| worked | mutated files, <20 tool calls - small task | N | $X | Ym |
+| quick | ≤5 tool calls - trivial | N | $X | Ym |
 
 2. **Burned sessions** (top 5 by API value): project, date, tool count, compactions, cost, first prompt
-3. **Loops**: files edited 5+ times in one session — these are where Claude got stuck
+3. **Loops**: files edited 5+ times in one session - these are where Claude got stuck
 4. **Compaction by session length**: when does context overflow start?
-5. **Insight**: "X% of sessions shipped commits. burned sessions cost $Y total — consider splitting these into smaller tasks."
+5. **Insight**: "X% of sessions shipped commits. burned sessions cost $Y total - consider splitting these into smaller tasks."
 
 ---
 
 ### FREEFORM (anything else)
 
-If the user's question doesn't match dashboard, search, or health — use the schema to construct a read-only SELECT query. Claude is great at this. Just follow the rules.
+If the user's question doesn't match dashboard, search, or health - use the schema to construct a read-only SELECT query. Claude is great at this. Just follow the rules.
 
 **Schema reference** (key tables and views):
 
@@ -254,7 +254,7 @@ If the user's question doesn't match dashboard, search, or health — use the sc
 | `subagents` | parent_session_id, agent_type, duration_seconds, tool_use_count |
 | `messages` | session_id, role, content_preview, input_tokens, output_tokens, cache_read_tokens |
 | `messages_fts` | FTS5 full-text index on messages (use MATCH) |
-| `user_session_costs` | **main view** — sessions with costs, durations, tokens (is_subagent=0, valid model) |
+| `user_session_costs` | **main view** - sessions with costs, durations, tokens (is_subagent=0, valid model) |
 | `user_tool_calls` | tool calls with project_name (main sessions only) |
 | `project_costs` | per-project aggregates |
 | `daily_costs` | per-day aggregates |
@@ -274,7 +274,7 @@ NEVER write to the database. NEVER show SQL to the user. If a query fails, descr
 
 ## Subscription plan awareness
 
-`estimated_cost_usd` is the **API inference value** — what usage would cost at per-token rates. Most Claude Code users are on a subscription.
+`estimated_cost_usd` is the **API inference value** - what usage would cost at per-token rates. Most Claude Code users are on a subscription.
 
 | plan | price | notes |
 |---|---|---|
@@ -283,7 +283,7 @@ NEVER write to the database. NEVER show SQL to the user. If a query fails, descr
 | Max 20x | $200/month | 20x Pro allowance |
 | API direct | per-token | billed at published rates |
 
-- Label dollar amounts as **"API value"** not "cost" — subscription users aren't paying per-token
+- Label dollar amounts as **"API value"** not "cost" - subscription users aren't paying per-token
 - When showing totals, add ROI context: `$2,055 API value → 103x Pro · 21x Max 5x · 10x Max 20x`
 
 ## Presentation rules
@@ -293,7 +293,7 @@ NEVER write to the database. NEVER show SQL to the user. If a query fails, descr
 - Run ALL queries in ONE Bash call. Present ONE formatted result
 - Format: dollars with commas + 2 decimals, tokens with K/M/B suffixes
 - Every top-N list ends with a summary of what was excluded ("+N more...")
-- Every output includes at least one **insight line** — a short observation derived from the data
+- Every output includes at least one **insight line** - a short observation derived from the data
 - Read-only. NEVER write to the database
 - Escape single quotes by doubling them in SQL strings
 - NEVER show SQL, table names, or raw query output to the user

@@ -1,5 +1,5 @@
 ---
-description: your usage data — sessions, costs, search, and patterns
+description: your usage data - sessions, costs, search, and patterns
 allowed-tools:
   - Bash
   - Read

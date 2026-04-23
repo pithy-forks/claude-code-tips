@@ -26,7 +26,7 @@
 - added 125-test suite (pytest)
 
 ### new tools
-- live session dashboard (`scripts/dashboard.py`) — textual TUI
+- live session dashboard (`scripts/dashboard.py`) - textual TUI
 - replay capture hook + /replay command
 - /dashboard slash command
 
