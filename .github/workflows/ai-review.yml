@@ -1,12 +1,14 @@
 name: AI Review Team
 
-# replaces coderabbit. two reviewers post separately; both read the
-# canonical rubric at .github/AI_REVIEW_RUBRIC.md so output is consistent.
+# both reviewers ride on github apps tied to the user's subscriptions
+# (claude max + chatgpt plus). this workflow posts one @mention comment per
+# pr/issue pointing both apps at the canonical rubric; the apps respond.
+# no api keys, no per-token billing, no curl plumbing.
 # see docs/review-process.md for the full process.
 
 on:
   pull_request:
-    types: [opened, synchronize, reopened, ready_for_review]
+    types: [opened, ready_for_review]
   issues:
     types: [opened]
   workflow_dispatch:
@@ -26,210 +28,52 @@ permissions:
   issues: write
 
 jobs:
-  claude-review:
-    name: claude
+  pr-review:
+    name: mention reviewers
     runs-on: ubuntu-latest
-    if: github.event.pull_request.draft != true
-    continue-on-error: true  # non-blocking; fails quietly if ANTHROPIC_API_KEY is unset
+    if: github.event_name != 'issues' && github.event.pull_request.draft != true
     steps:
       - uses: actions/checkout@v6
-        with:
-          fetch-depth: 0
 
-      - name: skip if no api key
+      - name: check for recent mention
         id: guard
         env:
-          HAS_KEY: ${{ secrets.ANTHROPIC_API_KEY != '' }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER: ${{ github.event.pull_request.number || inputs.pr_number }}
         run: |
-          if [ "${HAS_KEY}" != "true" ]; then
-            echo "ANTHROPIC_API_KEY unset; skipping claude review. set it in repo settings -> secrets to enable."
+          set -euo pipefail
+          cutoff=$(python3 -c "from datetime import datetime, timedelta, timezone; print((datetime.now(timezone.utc) - timedelta(days=7)).isoformat())")
+          recent=$(gh api "repos/${GITHUB_REPOSITORY}/issues/${PR_NUMBER}/comments" \
+            --jq "[.[] | select(.user.login == \"github-actions[bot]\" and (.body | contains(\"@claude\")) and .created_at > \"${cutoff}\")] | length")
+          if [ "${recent}" -gt 0 ]; then
+            echo "found ${recent} recent @claude mention(s) from this workflow within 7 days; skipping to avoid re-mention loop"
             echo "skip=true" >> "$GITHUB_OUTPUT"
           else
             echo "skip=false" >> "$GITHUB_OUTPUT"
           fi
 
-      - name: read rubric
-        if: steps.guard.outputs.skip != 'true'
-        id: rubric
-        run: |
-          {
-            echo 'content<<RUBRIC_EOF'
-            cat .github/AI_REVIEW_RUBRIC.md
-            echo 'RUBRIC_EOF'
-          } >> "$GITHUB_OUTPUT"
-
-      - name: run claude review
+      - name: post review mention
         if: steps.guard.outputs.skip != 'true'
         env:
-          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          PR_NUMBER: ${{ github.event.pull_request.number || inputs.pr_number }}
-          COMMIT_SHA: ${{ github.event.pull_request.head.sha }}
-          RUBRIC: ${{ steps.rubric.outputs.content }}
-        run: |
-          set -euo pipefail
-
-          diff_body=$(gh api "repos/${GITHUB_REPOSITORY}/pulls/${PR_NUMBER}" -H 'Accept: application/vnd.github.v3.diff')
-
-          # cap diff at ~200k chars to stay well under claude's input ceiling
-          if [ ${#diff_body} -gt 200000 ]; then
-            diff_body="${diff_body:0:200000}"$'\n\n[diff truncated at 200k chars]'
-          fi
-
-          payload=$(jq -n \
-            --arg sys "you are the claude reviewer on the ai-review-team. read the rubric below and follow it exactly. your lane: prose, voice, api/contract shape, skill + hook + plugin surface correctness, tests for the public path. skip perf micro-nits. produce one pr review comment in the exact output format from the rubric. set reviewer: claude. commit reviewed: ${COMMIT_SHA}." \
-            --arg rubric "$RUBRIC" \
-            --arg diff "$diff_body" \
-            '{
-              model: "claude-opus-4-7",
-              max_tokens: 4096,
-              system: ($sys + "\n\nRUBRIC:\n" + $rubric),
-              messages: [ { role: "user", content: ("diff to review:\n\n" + $diff) } ]
-            }')
-
-          review_body=$(curl -sS https://api.anthropic.com/v1/messages \
-            -H "x-api-key: ${ANTHROPIC_API_KEY}" \
-            -H "anthropic-version: 2023-06-01" \
-            -H "content-type: application/json" \
-            -d "$payload" \
-            | jq -r '.content[0].text // empty')
-
-          if [ -z "$review_body" ]; then
-            echo "claude returned empty review; skipping post"
-            exit 0
-          fi
-
-          gh pr comment "$PR_NUMBER" --body "$review_body"
-
-  codex-review:
-    name: codex
-    runs-on: ubuntu-latest
-    if: github.event.pull_request.draft != true
-    continue-on-error: true  # non-blocking; fails quietly if OPENAI_API_KEY is unset
-    steps:
-      - uses: actions/checkout@v6
-        with:
-          fetch-depth: 0
-
-      - name: skip if no api key
-        id: guard
-        env:
-          HAS_KEY: ${{ secrets.OPENAI_API_KEY != '' }}
-        run: |
-          if [ "${HAS_KEY}" != "true" ]; then
-            echo "OPENAI_API_KEY unset; skipping codex review. set it in repo settings -> secrets to enable."
-            echo "skip=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "skip=false" >> "$GITHUB_OUTPUT"
-          fi
-
-      - name: read rubric
-        if: steps.guard.outputs.skip != 'true'
-        id: rubric
-        run: |
-          {
-            echo 'content<<RUBRIC_EOF'
-            cat .github/AI_REVIEW_RUBRIC.md
-            echo 'RUBRIC_EOF'
-          } >> "$GITHUB_OUTPUT"
-
-      - name: run codex review
-        if: steps.guard.outputs.skip != 'true'
-        env:
-          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           PR_NUMBER: ${{ github.event.pull_request.number || inputs.pr_number }}
         run: |
           set -euo pipefail
-
-          # fetch the pr diff
-          diff_json=$(gh api "repos/${GITHUB_REPOSITORY}/pulls/${PR_NUMBER}" -H 'Accept: application/vnd.github.v3.diff')
-
-          # call openai responses api with the rubric + diff
-          # model choice: o3-mini for cost/latency; swap to o3 or gpt-4.1 for deeper passes
-          payload=$(jq -n \
-            --arg rubric "${{ steps.rubric.outputs.content }}" \
-            --arg diff "$diff_json" \
-            --arg sha "${{ github.event.pull_request.head.sha }}" \
-            '{
-              model: "o3-mini",
-              reasoning: { effort: "medium" },
-              input: [
-                {
-                  role: "system",
-                  content: "you are the codex reviewer on the ai-review-team. read the rubric below and follow it exactly. your lane: bugs, security, type/shell correctness, dependency hygiene, ci config. skip voice + marketing adjective nits (claude handles those). produce one pr review comment in the exact output format from the rubric. set reviewer: codex. commit reviewed: \($sha).\n\nRUBRIC:\n\($rubric)"
-                },
-                {
-                  role: "user",
-                  content: "diff to review:\n\n\($diff)"
-                }
-              ]
-            }')
-
-          review_body=$(curl -sS https://api.openai.com/v1/responses \
-            -H "Authorization: Bearer ${OPENAI_API_KEY}" \
-            -H "Content-Type: application/json" \
-            -d "$payload" \
-            | jq -r '.output[0].content[0].text // .output_text // empty')
-
-          if [ -z "$review_body" ]; then
-            echo "codex returned empty review; skipping post"
-            exit 0
-          fi
-
-          gh pr comment "$PR_NUMBER" --body "$review_body"
+          body=$'@claude @codex please review this pr per [.github/AI_REVIEW_RUBRIC.md](.github/AI_REVIEW_RUBRIC.md).\n\nlanes:\n- claude: prose, voice, api/contract shape, skill + hook + plugin surface correctness, tests for the public path.\n- codex: bugs, security, type/shell correctness, dependency hygiene, ci config.\n\noutput one pr comment each in the exact shape from the rubric. if an app is not installed on this repo, the mention sits unanswered and ci stays green.'
+          gh pr comment "${PR_NUMBER}" --body "${body}"
 
   issue-triage:
-    name: claude-issue-triage
+    name: mention triage
     runs-on: ubuntu-latest
     if: github.event_name == 'issues'
-    continue-on-error: true
     steps:
       - uses: actions/checkout@v6
 
-      - name: skip if no api key
-        id: guard
+      - name: post triage mention
         env:
-          HAS_KEY: ${{ secrets.ANTHROPIC_API_KEY != '' }}
-        run: |
-          if [ "${HAS_KEY}" != "true" ]; then
-            echo "ANTHROPIC_API_KEY unset; skipping issue triage."
-            echo "skip=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "skip=false" >> "$GITHUB_OUTPUT"
-          fi
-
-      - name: run claude issue triage
-        if: steps.guard.outputs.skip != 'true'
-        env:
-          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           ISSUE_NUMBER: ${{ github.event.issue.number }}
         run: |
           set -euo pipefail
-
-          issue=$(gh api "repos/${GITHUB_REPOSITORY}/issues/${ISSUE_NUMBER}")
-          title=$(echo "$issue" | jq -r '.title')
-          body=$(echo "$issue" | jq -r '.body // ""')
-
-          payload=$(jq -n \
-            --arg sys "triage this github issue. output a single comment with: category (bug | feature | docs | question | other), suggested priority (p0 | p1 | p2 | p3), one-paragraph summary, two to four suggested next steps. voice: lowercase, no em dashes, no marketing adjectives." \
-            --arg title "$title" \
-            --arg body "$body" \
-            '{
-              model: "claude-haiku-4-5-20251001",
-              max_tokens: 1024,
-              system: $sys,
-              messages: [ { role: "user", content: ("title: " + $title + "\n\nbody:\n" + $body) } ]
-            }')
-
-          triage=$(curl -sS https://api.anthropic.com/v1/messages \
-            -H "x-api-key: ${ANTHROPIC_API_KEY}" \
-            -H "anthropic-version: 2023-06-01" \
-            -H "content-type: application/json" \
-            -d "$payload" \
-            | jq -r '.content[0].text // empty')
-
-          if [ -n "$triage" ]; then
-            gh issue comment "$ISSUE_NUMBER" --body "$triage"
-          fi
+          body='@claude please triage this issue per [.github/AI_REVIEW_RUBRIC.md](.github/AI_REVIEW_RUBRIC.md) (issue-triage section).'
+          gh issue comment "${ISSUE_NUMBER}" --body "${body}"
