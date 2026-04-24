@@ -14,10 +14,11 @@ new here? start with the [tips index](./docs/tips/) or skim [hooks](./docs/hooks
 
 ## what's inside
 
-two plugins, one marketplace.
+three plugins, one marketplace.
 
 - **`mine@cc`** every session mined into sqlite. query costs, tools, errors, hotspots, loops, and full-text search across your own history. everything local.
 - **`cc@cc`** cross-session awareness and messaging. plus a `time` subsystem: `/cc:time-estimate` gives realistic claude-code time grounded in your session history, not optimistic guesses.
+- **`pulse@cc`** 3-meter proprioception (5-hour session, 7-day weekly, 200k context). pre-turn hook nudges claude toward cleaner handoffs as the meters fill. `/pulse state` reads them directly; `/pulse handoff` drafts a stopping point.
 
 ```
 > /cc:time-estimate "rewrite auth middleware and add tests"

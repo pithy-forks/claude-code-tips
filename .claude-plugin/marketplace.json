@@ -23,6 +23,14 @@
       "author": { "name": "Ani Potts" },
       "license": "MIT",
       "category": "analytics"
+    },
+    {
+      "name": "pulse",
+      "source": "./plugins/pulse",
+      "description": "gives claude code proprioception of its 5-hour, 7-day, and 200k-context meters. pre-turn hook injects threshold-aware context. /pulse state | handoff | quiet | loud.",
+      "author": { "name": "Ani Potts" },
+      "license": "MIT",
+      "category": "awareness"
     }
   ]
 }

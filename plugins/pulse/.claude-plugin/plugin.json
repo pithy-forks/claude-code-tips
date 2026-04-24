@@ -1,0 +1,11 @@
+{
+  "name": "pulse",
+  "version": "2.1.0",
+  "description": "Gives Claude Code proprioception of its three resource meters: 5-hour session, 7-day weekly cap, and current conversation context. Injects threshold-aware awareness into every prompt so Claude triages itself before you hit the wall.",
+  "author": {
+    "name": "Ani Potts",
+    "url": "https://github.com/anipotts"
+  },
+  "repository": "https://github.com/anipotts/claude-code-tips",
+  "license": "MIT"
+}
