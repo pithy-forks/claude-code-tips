@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
-# tested with: claude code v2.1.94
+# tested with: claude code v2.1.118
 # =============================================================================
-# Markdown Lint Fix — PostToolUse auto-fixer
+# Markdown Lint Fix: PostToolUse auto-fixer
 # =============================================================================
 # when a .md file is written or edited, runs markdownlint-fix on it.
 # prevents markdown-lint CI failures from accumulating.
@@ -34,7 +34,7 @@ if [ ! -f "$FILE_PATH" ]; then
   exit 0
 fi
 
-# run markdownlint-fix (silently — don't block on failure)
+# run markdownlint-fix (silently, don't block on failure)
 npx --yes markdownlint-cli2-fix "$FILE_PATH" 2>/dev/null || true
 
 exit 0

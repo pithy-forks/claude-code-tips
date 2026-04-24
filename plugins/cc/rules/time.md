@@ -1,4 +1,4 @@
-<!-- tested with: claude code v2.1.94 -->
+<!-- tested with: claude code v2.1.118 -->
 
 ## Think in Claude Code time, not human time
 

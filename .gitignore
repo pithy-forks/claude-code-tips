@@ -5,6 +5,7 @@ data/*
 handoffs/
 AUDIT.md
 AGENTS.md
+.phase-a-audit.md
 docs/upstream-watcher-design.md
 .claude/*
 !.claude/commands/

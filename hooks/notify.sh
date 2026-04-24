@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
-# tested with: claude code v2.1.94
+# tested with: claude code v2.1.118
 # =============================================================================
-# Notify — Custom notification routing for Claude Code
+# Notify: Custom notification routing for Claude Code
 # =============================================================================
 # Fires when Claude Code sends a notification (e.g., task complete, waiting
 # for input, error encountered).

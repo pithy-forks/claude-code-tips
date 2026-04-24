@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
-# tested with: claude code v2.1.94
+# tested with: claude code v2.1.118
 # =============================================================================
-# Panopticon — PostToolUse audit trail
+# Panopticon: PostToolUse audit trail
 # =============================================================================
 # Logs every Claude Code tool action to a local SQLite database.
 # Database location: ~/.claude/panopticon.db

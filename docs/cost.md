@@ -1,4 +1,4 @@
-<!-- tested with: claude code v2.1.94 -->
+<!-- tested with: claude code v2.1.118 -->
 
 # cost
 
@@ -10,10 +10,6 @@ what claude code actually costs, how caching saves 81% of it, and the strategies
 
 most cost discussions are vibes. "it's expensive" or "it's worth it" without data. here are mine.
 
-
-
-
-
 ### monitor changes to background process cost
 
 prior to monitor (v<2.1.98), watching background processes required `/loop` polling -- full API calls on a timer, expensive when idle. monitor (v2.1.98+) is event-driven: the script runs continuously, tokens consumed only when output matches a filter. idle monitoring costs zero tokens.
@@ -24,15 +20,13 @@ if you're on v2.1.98+, use monitor instead of `/loop` for all long-running proce
 
 the `/monitor` tool (v2.1.98+) changes cost dynamics for long-running background processes. stream filters and poll filters emit events only when conditions are met, not on a schedule. idle monitoring costs zero tokens. this reduces the cost of watching test runners, build processes, and deploy status checks compared to `/loop` polling.
 
-
-
 monitor is now a stable feature (v2.1.98+) and is the preferred method for long-running background process watching. it replaces the earlier `/loop` polling pattern for most use cases.
 
 ### what i pay
 
 **$200/mo.** Max plan. flat rate. no per-token billing. no surprises.
 
-that $200 covers everything — hundreds of sessions, thousands of subagent spawns. run `/mine` to see your own numbers.
+that $200 covers everything. hundreds of sessions, thousands of subagent spawns. run `/mine` to see your own numbers.
 
 ### what your plan costs
 
@@ -42,14 +36,14 @@ that $200 covers everything — hundreds of sessions, thousands of subagent spaw
 | max | $200 | flat rate, 20x Pro limits. generous enough that most users won't hit them. |
 | API (pay-per-use) | variable | billed per token. caching saves ~87% on input costs. |
 
-on pro or max, **you don't pay per token.** the mine.db cost estimates are hypothetical — they show what your usage would cost at API list prices, not what you actually pay.
+on pro or max, **you don't pay per token.** the mine.db cost estimates are hypothetical: they show what your usage would cost at API list prices, not what you actually pay.
 
 ### why caching still matters on a flat plan
 
 even though you don't pay per token, caching affects:
-- **speed** — cached prefixes return faster (less compute to process)
-- **rate limits** — fewer tokens consumed per turn = more headroom before throttling
-- **context quality** — stable CLAUDE.md = stable cache prefix = consistent behavior
+- **speed**: cached prefixes return faster (less compute to process)
+- **rate limits**: fewer tokens consumed per turn = more headroom before throttling
+- **context quality**: stable CLAUDE.md = stable cache prefix = consistent behavior
 
 my cache hit rate is 95% overall (83% for short sessions, 96% for long ones).
 

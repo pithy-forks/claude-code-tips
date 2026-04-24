@@ -8,9 +8,23 @@
 [![tested with](https://img.shields.io/badge/tested%20with-Claude%20Code%20v2.1.94-000?style=flat-square&labelColor=D4A574&logo=anthropic&logoColor=white)](https://docs.anthropic.com/en/docs/claude-code)
 [![license](https://img.shields.io/github/license/anipotts/claude-code-tips?style=flat-square&labelColor=111827&color=000)](./LICENSE)
 
-my claude code setup, open source. hooks, agents, tips, and a plugin that mines your usage data.
+claude code patterns, battle-tested across yc startups, public tech companies, and unicorns. maintained by someone who uses claude code as their job.
 
-if this saves you time, [star it](https://github.com/anipotts/claude-code-tips). it helps others find it.
+new here? start with the [tips index](./docs/tips/) or skim [hooks](./docs/hooks.md) and [automation](./docs/automation.md).
+
+## what's inside
+
+three plugins, one marketplace.
+
+- **`mine@cc`** every session mined into sqlite. query costs, tools, errors, hotspots, loops, and full-text search across your own history. everything local.
+- **`cc@cc`** cross-session awareness and messaging. plus a `time` subsystem: `/cc:time-estimate` gives realistic claude-code time grounded in your session history, not optimistic guesses.
+- **`fuel@cc`** 3-meter fuel gauge (5-hour session, 7-day weekly, 200k context). pre-turn hook nudges claude toward cleaner handoffs as the meters fill. `/fuel state` reads them directly; `/fuel handoff` drafts a stopping point.
+
+```
+> /cc:time-estimate "rewrite auth middleware and add tests"
+CC: ~22 min active (standard mode, Opus 4.7 high)
+your time: ~15 min review
+```
 
 ## quick start
 
@@ -58,15 +72,18 @@ start with `mine` + the `safety-guard` hook. add more as you go. **[mine docs &r
 
 ## cc plugin
 
-cross-session messaging. see what other claude code sessions are doing, send messages between them.
+cross-session messaging and the `time` subsystem. see what other claude code sessions are doing, send messages between them, and get realistic time estimates grounded in your own session history.
 
 ```bash
 /plugin install cc@cc
 ```
 
 ```
-/cc                          show active sessions
-/cc send merizo "pause"      message another session
+/cc                             show active sessions
+/cc send merizo "pause"         message another session
+/cc:time-estimate <task>        ranged CC estimate, uses your current model + effort
+/cc:time-calibrate              diff real throughput (from mine.db) against the rule
+/cc:time-benchmark              guided A/B/C across effort levels on your model
 ```
 
 ---

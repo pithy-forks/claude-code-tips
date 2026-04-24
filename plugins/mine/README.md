@@ -1,4 +1,4 @@
-<!-- tested with: claude code v2.1.94 -->
+<!-- tested with: claude code v2.1.118 -->
 
 # mine
 
@@ -37,10 +37,10 @@ data lives at `~/.claude/mine.db`. nothing leaves your machine.
 
 ## structure
 
-- `.claude-plugin/plugin.json` — plugin manifest
-- `hooks/hook.py` — unified hook dispatcher
-- `hooks/hooks.json` — hook event registrations
-- `scripts/mine.py` — bulk session parser (backfill, incremental, export)
-- `scripts/schema.sql` — database schema
-- `skills/` — `/mine` and `/mine:help` skills
-- `tests/` — 125 tests
+- `.claude-plugin/plugin.json` - plugin manifest
+- `hooks/hook.py` - unified hook dispatcher
+- `hooks/hooks.json` - hook event registrations
+- `scripts/mine.py` - bulk session parser (backfill, incremental, export)
+- `scripts/schema.sql` - database schema
+- `skills/` - `/mine` and `/mine:help` skills
+- `tests/` - 125 tests

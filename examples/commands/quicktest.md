@@ -1,4 +1,4 @@
-<!-- tested with: claude code v2.1.94 -->
+<!-- tested with: claude code v2.1.118 -->
 ---
 name: quicktest
 description: run tests for current file
@@ -108,13 +108,13 @@ If no test file was found:
    - Create test file following the project's existing test conventions
    - Write basic test structure with describe blocks for each exported function
    - Add 2-3 edge case tests per function (empty input, error path, boundary)
-   - Don't write the actual assertions — use TODO comments so the user fills in expected values
+   - Don't write the actual assertions: use TODO comments so the user fills in expected values
 3. Run the new test file to verify it at least loads without syntax errors
 
 ## Rules
 - Only run the single test file, never the full test suite
 - If tests take longer than 60 seconds, kill and report timeout
-- Don't modify source code to make tests pass — just report what failed
+- Don't modify source code to make tests pass. just report what failed
 - If the project has no test runner configured, say so and suggest one
 ```
 

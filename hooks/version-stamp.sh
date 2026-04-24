@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
-# tested with: claude code v2.1.94
+# tested with: claude code v2.1.118
 # =============================================================================
-# Version Stamp — SessionEnd auto-updater
+# Version Stamp: SessionEnd auto-updater
 # =============================================================================
 # when a session modifies files in docs/, hooks/, plugins/, or scripts/,
 # auto-updates "tested with: claude code vX.Y.Z" stamps to current version.

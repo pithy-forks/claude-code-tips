@@ -1,7 +1,7 @@
 {
   "name": "broadcast",
   "version": "0.1.0",
-  "description": "async notifications when claude ships something. slack, discord, wherever — fire and forget",
+  "description": "async notifications when claude ships something. slack, discord, wherever. fire and forget",
   "author": {
     "name": "Ani Potts"
   },

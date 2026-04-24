@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
-# tested with: claude code v2.1.94
+# tested with: claude code v2.1.118
 # =============================================================================
-# Stale Branch Reminder — SessionStart notification
+# Stale Branch Reminder: SessionStart notification
 # =============================================================================
 # on session start, checks for local branches whose tracking branch is gone.
 # prints a reminder to clean up.

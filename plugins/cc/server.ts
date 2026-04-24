@@ -530,7 +530,7 @@ const tool = {
 };
 
 const server = new Server(
-  { name: "cc", version: "2.0.0" },
+  { name: "cc", version: "2.1.0" },
   { capabilities: { tools: {}, experimental: { "claude/channel": {} } } },
 );
 

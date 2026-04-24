@@ -22,11 +22,11 @@ zero configuration. works on macos, linux, wsl. needs node 18+.
 ## quickstart
 
 ```
-/cc                                 list other sessions on this machine
-/cc send <name> "hello"             direct message; recipient sees it on next turn
-/cc announce "refactoring auth"     broadcast a status update; peers see it in their digest
-/cc subscribe #auth                 join a topic
-/cc send --topic=#auth "..."        broadcast to topic subscribers
+/cc:sessions                                 list other sessions on this machine
+/cc:sessions send <name> "hello"             direct message; recipient sees it on next turn
+/cc:sessions announce "refactoring auth"     broadcast a status update; peers see it in their digest
+/cc:sessions subscribe #auth                 join a topic
+/cc:sessions send --topic=#auth "..."        broadcast to topic subscribers
 ```
 
 ## how awareness works (the gmail-cc metaphor)
@@ -56,7 +56,7 @@ activity:
 - quantercise @ ~/repo-b (lib/deploy/staging.ts): investigating failed CF deploy [12m]
 
 file overlap:
-- src/auth.ts: also touched by merizo within 8m. coordinate via /cc send merizo
+- src/auth.ts: also touched by merizo within 8m. coordinate via /cc:sessions send merizo
 ```
 
 active turn cost: ~200-400 tokens. quiet turn cost: 0 tokens.
@@ -72,7 +72,7 @@ active turn cost: ~200-400 tokens. quiet turn cost: 0 tokens.
 | `subscribe` | join a topic (e.g. `#auth`). optional `role` tags your session |
 | `unsubscribe` | leave a topic |
 | `cleanup` | deregister self (called by `SessionEnd` hook) |
-| `ask` / `answer` | scaffolded; wired in 2.1.0. use `/cc send` with `urgency: question` for now |
+| `ask` / `answer` | scaffolded; wired in 2.1.0. use `/cc:sessions send` with `urgency: question` for now |
 
 ## file-overlap alerts (the killer feature)
 
@@ -133,11 +133,11 @@ plugins/cc/
 ├── hooks/
 │   ├── hooks.json                  3 mcp_tool hooks (SessionStart, UserPromptSubmit, SessionEnd)
 │   └── time-project-hint.sh        SessionStart project-timing hint (time subsystem)
-├── commands/cc.md                  /cc slash command
+├── commands/sessions.md            /cc:sessions slash command
 ├── rules/time.md                   time budgeting rule
-├── skills/time-estimate/           /time-estimate <task>
-├── skills/time-calibrate/          /time-calibrate
-└── skills/time-benchmark/          /time-benchmark
+├── skills/time-estimate/           model-callable only (user-invocable: false)
+├── skills/time-calibrate/          model-callable only (user-invocable: false)
+└── skills/time-benchmark/          model-callable only (user-invocable: false)
 ```
 
 state at `${CLAUDE_CONFIG_DIR:-~/.claude}/cc/`:
@@ -157,9 +157,9 @@ sessions converge safely.
 
 - **no digest shows up:** check that the plugin is enabled (`/plugin` menu).
   if your cc state dir didn't exist, it's created on first launch; run any
-  tool that loads the mcp server, then try `/cc`.
+  tool that loads the mcp server, then try `/cc:sessions`.
 - **"session X not found":** recipient session needs cc enabled and must be
-  live (heartbeat every 30s). use `/cc sessions` to see what's live.
+  live (heartbeat every 30s). use `/cc:sessions` to see what's live.
 - **session name shows as 8-char id:** cc pulls the native session name from
   `~/.claude/sessions/<pid>.json` when available; falls back to `basename(cwd)`
   otherwise.
@@ -177,9 +177,11 @@ cc also hosts the `time` subsystem introduced in v1.1.0 (unchanged):
 
 - `rules/time.md`: cc-time budgeting rule (bimodal modes, model × effort matrix, 3 tiers of parallelism)
 - `hooks/time-project-hint.sh`: `SessionStart` project-scoped timing hint, reads `~/.claude/mine.db` if present
-- `/time-estimate <task>`: produces a ranged estimate with effort-rung cited
-- `/time-calibrate`: diffs your real throughput (needs `mine` plugin)
-- `/time-benchmark`: A/B/C across `/effort low`/`medium`/`high` on your current model
+- `/cc:time-estimate <task>`: produces a ranged estimate with effort-rung cited
+- `/cc:time-calibrate`: diffs your real throughput (needs `mine` plugin)
+- `/cc:time-benchmark`: A/B/C across `/effort low`/`medium`/`high` on your current model
+
+skills are namespaced under `cc:`. claude code will accept the bare form (`/time-estimate`) when no other plugin registers the same name; the namespaced form is the canonical one.
 
 see `rules/time.md` for the full matrix and estimation format.
 

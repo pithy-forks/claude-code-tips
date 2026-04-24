@@ -1,8 +1,9 @@
 ---
 name: time-calibrate
 description: measure your real CC throughput against the time rule's matrix, using mine.db
+user-invocable: false
 ---
-<!-- tested with: claude code v2.1.94 -->
+<!-- tested with: claude code v2.1.118 -->
 
 # /time-calibrate
 

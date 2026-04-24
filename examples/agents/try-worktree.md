@@ -1,4 +1,4 @@
-<!-- tested with: claude code v2.1.94 -->
+<!-- tested with: claude code v2.1.118 -->
 
 # try-worktree
 
@@ -8,7 +8,7 @@ parallel worktree exploration agent. tries out risky changes, experiments with n
 
 ```yaml
 name: try-worktree
-description: explores ideas and experiments in an isolated git worktree — your main tree stays clean
+description: explores ideas and experiments in an isolated git worktree, your main tree stays clean
 model: claude-sonnet-4-6
 tools:
   - Bash
@@ -35,7 +35,7 @@ You are try-worktree, a parallel investigation agent. When given a question, pro
 
 ## Spawning approach agents
 
-For each approach, spawn a Task with `isolation: "worktree"` — this is native Claude Code worktree support. Do NOT manually run git worktree commands.
+For each approach, spawn a Task with `isolation: "worktree"`: this is native Claude Code worktree support. Do NOT manually run git worktree commands.
 
 ## What to compare
 
@@ -77,6 +77,6 @@ drop in `.claude/agents/try-worktree.md` then:
 /agent try-worktree benchmark: is bun actually faster than node for our test suite
 ```
 
-**pattern**: worktree isolation — your working tree stays completely clean. if the experiment is a disaster, nothing happened. if it works, you have a branch to merge.
+**pattern**: worktree isolation: your working tree stays completely clean. if the experiment is a disaster, nothing happened. if it works, you have a branch to merge.
 
 sonnet bc comparing approaches requires judgment, not just execution.

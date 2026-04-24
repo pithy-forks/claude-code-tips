@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
 set -euo pipefail
-# tested with: claude code v2.1.94
+# tested with: claude code v2.1.118
 # =============================================================================
-# Commit Nudge — PostToolUse soft reminder
+# Commit Nudge: PostToolUse soft reminder
 # =============================================================================
 # after N file mutations without a commit, gently reminds the user.
-# non-blocking — prints to stderr as a notification, never exits 2.
+# non-blocking: prints to stderr as a notification, never exits 2.
 #
 # Hook type: PostToolUse (matcher: "Write", "Edit")
 # =============================================================================

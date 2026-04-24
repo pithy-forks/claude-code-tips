@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 set -euo pipefail
-# tested with: claude code v2.1.94
+# tested with: claude code v2.1.118
 # =============================================================================
-# No Squash — PreToolUse command blocker
+# No Squash: PreToolUse command blocker
 # =============================================================================
-# Blocks any squash merge attempt. regular merges only — preserve commit history.
+# Blocks any squash merge attempt. regular merges only, preserve commit history.
 #
 # Hook type: PreToolUse (matcher: "Bash")
 #
