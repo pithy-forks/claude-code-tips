@@ -8,219 +8,236 @@
 [![tested with](https://img.shields.io/badge/tested%20with-Claude%20Code%20v2.1.94-000?style=flat-square&labelColor=D4A574&logo=anthropic&logoColor=white)](https://docs.anthropic.com/en/docs/claude-code)
 [![license](https://img.shields.io/github/license/anipotts/claude-code-tips?style=flat-square&labelColor=111827&color=000)](./LICENSE)
 
-俺のClaude Code設定をオープンソース化したやつ。hooks、agents、tips、そしてお前の使用データを掘り出すプラグインがある。
+YC スタートアップから大手テック企業、ユニコーン企業まで、実戦で鍛えられた Claude Code のパターン集。Claude Code を仕事にしてる人間が保守している。
 
-これで時間が浮いたら、[スターをつけて](https://github.com/anipotts/claude-code-tips)くれ。他の奴らが見つけやすくなるからな。
+初めてなら[tips インデックス](./docs/tips/)から始めるか、[hooks](./docs/hooks.md)と[automation](./docs/automation.md)をざっと見ておくといい。
+
+## 中身
+
+3つのプラグイン、1つのマーケットプレイス。
+
+- **`mine@cc`** セッションごとに sqlite に採掘して記録。コスト、ツール、エラー、ホットスポット、ループを問い合わせたり、自分の履歴全体を全文検索できる。すべてローカル。
+- **`cc@cc`** セッション間での認識とメッセージング。さらに`time`サブシステム付き。`/cc:time-estimate`で Claude Code の現実的な時間を出す。楽観的な予測じゃなくて、あなたのセッション履歴に基づいてる。
+- **`fuel@cc`** 3段階フューエルゲージ（5時間セッション、7日間週次、200k コンテキスト）。メーターが満杯に近づくとプリターンフックで Claude をきれいなハンドオフへ導く。`/fuel state`で直接読み込める。`/fuel handoff`で停止ポイントを作成。
+
+```
+> /cc:time-estimate "auth ミドルウェアを書き直してテストを追加"
+CC: ~22 分有効稼働（標準モード、Opus 4.7 high）
+あなたの時間: ~15 分レビュー
+```
 
 ## クイックスタート
 
 ```bash
-/plugin marketplace add anipotts/claude-code-tips   # marketplace追加（初回のみ）
-/plugin install mine@cc                             # mineをインストール（セッション分析）
-/plugin install cc@cc                               # ccをインストール（クロスセッションメッセージング）
+/plugin marketplace add anipotts/claude-code-tips   # マーケットプレイスを追加（初回のみ）
+/plugin install mine@cc                             # mine をインストール（セッション分析）
+/plugin install cc@cc                               # cc をインストール（クロスセッションメッセージング）
 ```
 
-それから：[safety-guard.sh](./hooks/safety-guard.sh)を危険なコマンドをブロックするためにコピーしろ。[ティップス](./docs/tips/)を読め。以上だ。
+その後：[safety-guard.sh](./hooks/safety-guard.sh)をコピーして危険なコマンドをブロック。[tip](./docs/tips/)を読む。終わり。
 
 ---
 
-## 数字で見ると
+## 数字
 
-数十個のプロジェクト、数百のセッション。最大プラン月200ドルだ。
+数十プロジェクトにまたがる数百セッション。月額最大プラン $200。
 
-同じ使用量だと、キャッシング付きAPIで約12000ドル、キャッシングなしだと約95000ドル。自律ループはなし。cronジョブもなし。全セッションはお前がプロンプトを打つことから始まる。[コスト計算がどう動作してるかを見る &rarr;](./docs/cost.md)
+同じ使い方を API でやると、キャッシング使ってざっと $12K、キャッシングなしで $95K かかる。自律ループなし。cron ジョブなし。すべてのセッションはプロンプトを打つところから始まる。[コスト計算の仕組み &rarr;](./docs/cost.md)
 
 <img src="./gifs/mine-stats.gif" width="100%" alt="mine stats showing sessions, tokens, costs, and projects" />
 
 ---
 
-## mineプラグインをインストールする
+## mine プラグインをインストール
 
 ```bash
-/plugin marketplace add anipotts/claude-code-tips   # marketplace追加（初回のみ）
-/plugin install mine@cc                             # mineをインストール（セッション分析）
-/plugin install cc@cc                               # ccをインストール（クロスセッションメッセージング）
+/plugin marketplace add anipotts/claude-code-tips   # マーケットプレイスを追加（初回のみ）
+/plugin install mine@cc                             # mine をインストール（セッション分析）
+/plugin install cc@cc                               # cc をインストール（クロスセッションメッセージング）
 ```
 
-**[mine](./plugins/mine/)**が手に入る · セッションをsqliteにマイニング。コスト、検索、エラーメモリ、パターン検出。全部のデータはローカルの`~/.claude/mine.db`に残る。
+**[mine](./plugins/mine/)**を手に入れる・セッションマイニングを sqlite へ。コスト、検索、エラーメモリ、パターン検出。すべてのデータは`~/.claude/mine.db`のローカルに残る。
 
 ```
-/mine                     今日のセッション、コスト、トップツール
-/mine search "websocket"  全会話を通じた全文検索
-/mine mistakes            Claudeが何度も繰り返してるエラーパターン
-/mine hotspots            セッション全体で最も編集されたファイル
-/mine loops               セッション全体の繰り返しパターン
+/mine                     今日のセッション、コスト、よく使うツール
+/mine search "websocket"  すべての会話を全文検索
+/mine mistakes            Claude が繰り返すエラーパターン
+/mine hotspots            セッション横断で最も編集されたファイル
+/mine loops               セッション横断で繰り返されるパターン
 ```
 
-`mine`と`safety-guard` hookから始めろ。あとは必要に応じて足していく。**[mineドキュメント &rarr;](./plugins/mine/)**
+`mine` + `safety-guard` フックから始めて、慣れたら追加していく。**[mine ドキュメント &rarr;](./plugins/mine/)**
 
 ---
 
-## cc plugin
+## cc プラグイン
 
-クロスセッションメッセージング。他のclaude codeセッションが何をしているか確認し、セッション間でメッセージを送る。
+クロスセッションメッセージングと`time`サブシステム。他の Claude Code セッションが何をしてるか見て、メッセージを送り、あなた自身のセッション履歴に基づいた現実的な時間推定を得る。
 
 ```bash
 /plugin install cc@cc
 ```
 
 ```
-/cc                          アクティブなセッションを表示
-/cc send merizo "pause"      別のセッションにメッセージを送る
+/cc                             アクティブセッションを表示
+/cc send merizo "pause"         別のセッションにメッセージを送る
+/cc:time-estimate <task>        範囲付き CC 推定、あなたの現在のモデル＋努力を使う
+/cc:time-calibrate              実際のスループット（mine.db から）をルールと比較
+/cc:time-benchmark              あなたのモデルで努力レベル A/B/C をガイド付きで測定
 ```
 
 ---
 
-## 俺のコード作成を変えた3つのこと
+## 僕のコーディング方法を変えた3つのこと
 
 ### hooks
 
-hooksがあるかないかで「Claudeが俺の思い通りに動く」と「Claudeが気分次第で動く」が決まる。CLAUDE.mdはガイダンス。hooksは実行。一つはアドバイス、もう一つは壁だ。
+hooks があるかないかで「Claude が僕の思い通りにする」と「Claude が気分でやる」の差が出る。CLAUDE.md はガイダンス。hooks は強制。一方は提案、もう一方は壁だ。
 
-このリポジトリには9個のhooksがあって、どんなプロジェクトにでもドロップできる。safety-guardはforcce push、`rm -rf /`、`curl | bash`をブロック。no-squashはスクウォッシュマージをブロック。context-saveはコンパクション前に状態を保存。お前のワークフローに合うやつを選べ。[hookガイド &rarr;](./docs/hooks.md)
+このリポジトリには 9つの hooks があって、どのプロジェクトにでも落とし込める。safety-guard はフォースプッシュ、`rm -rf /`、`curl | bash`をブロック。no-squash はスクワッシュマージをブロック。context-save は圧縮前の状態を保存。あなたのワークフローに合わせて選べ。[hook ガイド &rarr;](./docs/hooks.md)
 
-### agent teams
+### エージェントチーム
 
-複数のClaudeインスタンスが同時に同じコードベースで動く、各々独立したgit worktreeの中で。コーディネーターがタスクを割り当て、結果を集めて、最適なアプローチをマージする。
+複数の Claude インスタンスが同時に同じコードベースで動く。それぞれ独自の git worktree にいる。コーディネーターがタスクを割り当てて、結果を集めて、最良のアプローチをマージする。
 
-平行リサーチ、危険な変更を安全に試す、ワーキングツリーに触れずにアプローチを比較する時に使ってる。[どうやってagent teamsを使ってるか &rarr;](./docs/agents.md)
+並列リサーチに、リスクのある変更を安全に試すのに、ワーキングツリーを触らずにアプローチを並べて比較するのに使ってる。[エージェントチームの使い方 &rarr;](./docs/agents.md)
 
 ### prompt caching
 
-月200ドルプランが脚本AI開発で最高の取引な理由がこれだ。Claude Codeはシステムプロンプト、ツール、CLAUDE.mdを接頭辞としてキャッシュする。俺の入力トークンの91%がキャッシュヒット、つまり91%の読み込みで入力コストの10%だけ払う。
+これが $200/月プランが AI コーディング最強のディールな理由。Claude Code はあなたのシステムプロンプト、ツール、CLAUDE.md をプレフィックスとしてキャッシュする。僕のインプットトークンの 91% がキャッシュ命中してる。つまり読み込みの 91% のインプットコストを 10% で済ましてる。
 
-キー：CLAUDE.mdは短く安定を保て。編集するたびに接頭辞キャッシュが壊れる。俺のは30行で週1回位の更新だ。[完全なコスト内訳 &rarr;](./docs/cost.md)
+コツ：CLAUDE.md は短く、安定に保つ。編集のたびにプレフィックスキャッシュが壊れる。僕のは 30行で、週1回くらいしか変わらない。[コスト内訳の詳細 &rarr;](./docs/cost.md)
 
 ---
 
-## ティップス
+## Tips
 
-短くて独立したテクニック。各々次のセッションで使える何かだ。
+短く、単独で使える技法。次のセッションで使える何かがそれぞれ詰まってる。
 
-| ティップス | 学べること |
-|-----|---------------|
-| [prompt caching](./docs/tips/prompt-caching.md) | 97%以上のキャッシュヒット率を出す、請求を削る |
-| [safety hooks](./docs/tips/safety-hooks.md) | 5分でforcce pushと`rm -rf`をブロック |
-| [settings hierarchy](./docs/tips/settings-hierarchy.md) | プロジェクトvs グローバルvs ローカル設定 |
-| [session length](./docs/tips/session-length.md) | 短いセッションがなぜ効率的か（データ付き） |
+| Tip | 学べること |
+|-----|-----------|
+| [prompt caching](./docs/tips/prompt-caching.md) | キャッシュヒット率 97%+、請求を大幅削減 |
+| [safety hooks](./docs/tips/safety-hooks.md) | フォースプッシュと rm -rf を 5分でブロック |
+| [settings hierarchy](./docs/tips/settings-hierarchy.md) | プロジェクト vs グローバル vs ローカル設定 |
+| [session length](./docs/tips/session-length.md) | より短いセッションがより効率的な理由（データ付き） |
 | [ultrathink](./docs/tips/ultrathink.md) | 複雑な問題に拡張思考を強制 |
-| [context management](./docs/tips/context-management.md) | コンパクション戦略、アクティブツールレート、セッションを締める |
-| [plan mode](./docs/tips/plan-mode.md) | プランニングが時間を節約する時vs 無駄にする時 |
-| [fast mode](./docs/tips/fast-mode.md) | 同じモデル、高速出力、トレードオフ |
-| [plugins](./docs/tips/plugins.md) | スクラッチからプラグインを作る、インストール価値のあるプラグインの条件 |
-| [subagents](./docs/tips/subagents.md) | agent teams、worktree分離、平行処理がペイする時 |
-| [mcp integration](./docs/tips/mcp-integration.md) | MCPサーバーを配線、セッション内で使う |
-| [hooks v2](./docs/tips/hooks-v2.md) | commandvs httpvs prompthooks、非同期パターン |
+| [context management](./docs/tips/context-management.md) | 圧縮戦略、アクティブツール率、セッションを締める |
+| [plan mode](./docs/tips/plan-mode.md) | 計画が時間を節約するときと無駄にするとき |
+| [fast mode](./docs/tips/fast-mode.md) | 同じモデル、より速い出力、トレードオフ |
+| [plugins](./docs/tips/plugins.md) | ゼロからプラグインを構築、何がインストール価値あるか |
+| [subagents](./docs/tips/subagents.md) | エージェントチーム、worktree 隔離、並列がいつペイするか |
+| [mcp integration](./docs/tips/mcp-integration.md) | MCP サーバーをつなぐ、セッション内で使う |
+| [hooks v2](./docs/tips/hooks-v2.md) | command vs http vs prompt hooks、非同期パターン |
 
 ---
 
-## hooks
+## Hooks
 
-1つコピー、配線する、以上。各々独立したbashスクリプトだ。[完全ガイド &rarr;](./docs/hooks.md)
+1つコピーして、つなぐ。終わり。それぞれスタンドアロン bash スクリプト。[完全ガイド &rarr;](./docs/hooks.md)
 
-| hook | イベント | やること |
+| hook | イベント | 何をするか |
 |---|---|---|
-| [safety-guard](./hooks/safety-guard.sh) | PreToolUse | force push、`rm -rf /`、DROP TABLE、curl-pipe-shをブロック |
-| [no-squash](./hooks/no-squash.sh) | PreToolUse | スクウォッシュマージをブロック |
-| [panopticon](./hooks/panopticon.sh) | PostToolUse | 全ツール呼び出しをsqliteにログ |
-| [context-save](./hooks/context-save.sh) | PreCompact | 圧縮前にコンテキストを保存 |
-| [notify](./hooks/notify.sh) | Notification | macOS、Slack、ntfyにルーティング |
+| [safety-guard](./hooks/safety-guard.sh) | PreToolUse | フォースプッシュ、`rm -rf /`、DROP TABLE、curl-pipe-sh をブロック |
+| [no-squash](./hooks/no-squash.sh) | PreToolUse | スクワッシュマージをブロック |
+| [panopticon](./hooks/panopticon.sh) | PostToolUse | すべてのツール呼び出しを sqlite にログ |
+| [context-save](./hooks/context-save.sh) | PreCompact | 圧縮前にコンテキスト保存 |
+| [notify](./hooks/notify.sh) | Notification | macOS、Slack、ntfy にルーティング |
 
 <details>
-<summary>4つ以上のhooks</summary>
+<summary>あと4つの hooks</summary>
 
-| hook | イベント | やること |
+| hook | イベント | 何をするか |
 |---|---|---|
-| [commit-nudge](./hooks/commit-nudge.sh) | PostToolUse | N回の編集後にコミットを促す |
-| [version-stamp](./hooks/version-stamp.sh) | SessionEnd | 「テスト済み」スタンプを自動更新 |
-| [stale-branch](./hooks/stale-branch.sh) | SessionStart | なくなったトラッキングブランチを警告 |
-| [md-lint-fix](./hooks/md-lint-fix.sh) | PostToolUse | セーブ時にmarkdownリントを自動修正 |
+| [commit-nudge](./hooks/commit-nudge.sh) | PostToolUse | N回編集後にコミットするよう促す |
+| [version-stamp](./hooks/version-stamp.sh) | SessionEnd | "tested with" スタンプを自動更新 |
+| [stale-branch](./hooks/stale-branch.sh) | SessionStart | 消えたトラッキングブランチについて警告 |
+| [md-lint-fix](./hooks/md-lint-fix.sh) | PostToolUse | 保存時に markdown lint を自動修正 |
 
 </details>
 
 <img src="./gifs/hook-safety.gif" width="100%" alt="safety-guard blocking a dangerous command" />
 
-## エグザンプルagents
+## エージェント例
 
-`.claude/agents/`にコピーして`/agent <name>`で呼び出せ。各々違うパターンを教える。[ガイド &rarr;](./docs/agents.md)
+`.claude/agents/`にコピーして`/agent <name>`で呼び出す。それぞれ異なるパターンを教える。[ガイド &rarr;](./docs/agents.md)
 
-| agent | パターン | やること |
+| エージェント | パターン | 何をするか |
 |---|---|---|
-| [watch-tests](./examples/agents/watch-tests.md) | daemon | ファイルを監視、テストを実行、修正を提案 |
-| [try-worktree](./examples/agents/try-worktree.md) | worktree | 危険な変更を独立したworktreeで試す |
-| [arch-review](./examples/agents/arch-review.md) | quick review | 速いアーキテクチャ臭い検査 |
-| [write-pr](./examples/agents/write-pr.md) | git integration | diffからPR説明を生成 |
+| [watch-tests](./examples/agents/watch-tests.md) | daemon | ファイルを監視、テスト実行、修正提案 |
+| [try-worktree](./examples/agents/try-worktree.md) | worktree | リスクのある変更を隔離 worktree で試す |
+| [arch-review](./examples/agents/arch-review.md) | quick review | 高速なアーキテクチャ臭さ検査 |
+| [write-pr](./examples/agents/write-pr.md) | git integration | diff から PR 説明を生成 |
 
 ## 使ってるコマンド
 
-| コマンド | やること |
+| コマンド | 何をするか |
 |---|---|
-| `/mine` | 使用データ · コスト、セッション、検索、パターン |
-| `/ship` | ステージ、コミット、プッシュ、1コマンドでPRを開く |
-| `/improve` | gitヒストリーからCLAUDE.mdの更新を提案 |
+| `/mine` | 使用データ・コスト、セッション、検索、パターン |
+| `/ship` | stage、commit、push、PR open を1コマンドで |
+| `/improve` | git 履歴から CLAUDE.md 更新を提案 |
 
-他に[2つのエグザンプルコマンド](./examples/commands/)がある、コピーできるやつ：`/sweep`、`/quicktest`。
+さらに[2つのコマンド例](./examples/commands/)がコピーできる：`/sweep`、`/quicktest`。
 
 ---
 
-## 俺の個人的な見解
+## 個人的な見解
 
-| | 何 |
+| | 内容 |
 |---|---|
-| [コスト現実](./docs/cost.md) | Claude Codeが実際にいくらかかるか、prompt cacheingの数学 |
-| [やらかした失敗](./docs/mistakes.md) | 俺が燃やした奴だから、お前はスキップできる |
-| [自動化](./docs/automation.md) | このリポジトリを保つ12個のCIパイプライン |
-| [セッションワークフロー](./docs/session-workflow.md) | 日々のClaude Code作業の流れ |
-| [worktrees](./docs/worktrees.md) | デスクトップアプリでの平行探索 |
+| [cost reality](./docs/cost.md) | Claude Code は実際いくらかかるか、prompt caching 計算 |
+| [mistakes i made](./docs/mistakes.md) | 僕が燃やしたもの。あなたは避けられる |
+| [automation](./docs/automation.md) | このリポジトリを保つ 12個の CI パイプライン |
+| [session workflow](./docs/session-workflow.md) | 日々 Claude Code でどう働いてるか |
+| [worktrees](./docs/worktrees.md) | デスクトップアプリで並列探索 |
 
-## 他の選択肢との比較
+## vs 他の選択肢
 
-外交的で、データドリブン、FUDなし。全ての主張には出典がある。
+外交的で、データドリブン。FUD なし。すべての主張は出典を引き合いに出してる。
 
-[vs cursor](./docs/comparisons/cursor.md) &middot; [vs codex](./docs/comparisons/codex.md) &middot; [vs gemini](./docs/comparisons/gemini.md) &middot; [vs antigravity](./docs/comparisons/antigravity.md) &middot; [価格](./docs/comparisons/pricing.md)
-
----
-
-## エグザンプル
-
-- [CLAUDE.mdテンプレート](./examples/claude-md/) · TypeScript、Python、Rust、Next.jsのスターター設定
-- [エグザンプルagents](./examples/agents/) · 4つのagents、各々違うパターンを教える
-- [エグザンプルコマンド](./examples/commands/) · 2つのコマンド、どんなプロジェクトにでもコピーできる
-- [handoffプラグイン](./examples/plugins/handoff/) · PreCompactコンテキスト保存
-- [broadcastプラグイン](./examples/plugins/broadcast/) · gitイベント上の非同期通知
+[vs cursor](./docs/comparisons/cursor.md) &middot; [vs codex](./docs/comparisons/codex.md) &middot; [vs gemini](./docs/comparisons/gemini.md) &middot; [vs antigravity](./docs/comparisons/antigravity.md) &middot; [料金](./docs/comparisons/pricing.md)
 
 ---
 
-## このリポジトリがどう動いてるか
+## 例
 
-このリポジトリは独自のパターンの上に動いてる。
-
-- **12個のCIワークフロー** · docs監査、競争インテリジェンス、コミュニティダイジェスト、鮮度チェック、古いクリーンアップ、dependabot、リリース、プラグイン煙テスト、PRクオリティゲート、バリデーション、Claude応答者、アップストリーム監視
-- **11個のhooks**、全セッション上で動く
-- **月1ドル未満**のCI費 · AIパワード ワークフロー haikuを使う
-- **ゼロ手動保守** · センスが必要でないものは全部自動化
-
-[自動化詳細 &rarr;](./docs/automation.md)
+- [CLAUDE.md テンプレート](./examples/claude-md/) · TypeScript、Python、Rust、Next.js のスターター設定
+- [エージェント例](./examples/agents/) · 4つのエージェント、それぞれ異なるパターンを教える
+- [コマンド例](./examples/commands/) · どのプロジェクトにもコピーできる 2つのコマンド
+- [handoff プラグイン](./examples/plugins/handoff/) · PreCompact コンテキスト保存
+- [broadcast プラグイン](./examples/plugins/broadcast/) · git イベント時の非同期通知
 
 ---
 
-## これらのパターンから作ったツール
+## このリポジトリの仕組み
 
-全部Claude Code内で毎日生きてることから出てきた。各々俺が何度も当たった特定の問題を解く。
+このリポジトリは独自のパターンで動く。
 
-- **[mine](./plugins/mine/)** · セッションマイニングをsqliteに。コスト、検索、エラーメモリ、パターン検出
-- **[claudemon](https://github.com/anipotts/claudemon)** · プロジェクトとマシン全体のリアルタイムセッション監視
-- **[cc](./plugins/cc/)** · マルチセッション認識。他のセッションが何やってるか見る、メッセージ送る
-- **[imessage-mcp](https://github.com/anipotts/imessage-mcp)** · iMessageヒストリーの読み込み専用MCPサーバー。26のツール、ネットワーク リクエストゼロ
+- **12個の CI ワークフロー** · docs 監査、競争インテル、コミュニティダイジェスト、鮮度チェック、古いもの削除、dependabot、リリース、プラグイン smoke テスト、PR 品質ゲート、検証、Claude レスポンダー、アップストリーム監視
+- **11個の hooks** がすべてのセッションで動く
+- **$1/月未満** CI コスト · AI 駆動ワークフローは haiku を使う
+- **0 手動保守** · 趣味を必要としないものはすべて自動化
 
-## 俺の他の作品
+[自動化の詳細 &rarr;](./docs/automation.md)
 
-- [anipotts.com/thoughts](https://anipotts.com/thoughts) · 長編
+---
+
+## こうしたパターンから生まれたツール
+
+毎日 Claude Code にいて、何度も同じ問題に直面するのから出てきた。それぞれ特定の問題を解く。
+
+- **[mine](./plugins/mine/)** · セッションマイニングを sqlite へ。コスト、検索、エラーメモリ、パターン検出
+- **[claudemon](https://github.com/anipotts/claudemon)** · プロジェクトとマシン横断でリアルタイムセッション監視
+- **[cc](./plugins/cc/)** · マルチセッション認識。他のセッションが何してるか見て、メッセージを送る
+- **[imessage-mcp](https://github.com/anipotts/imessage-mcp)** · iMessage 履歴の読み取り専用 MCP サーバー。26ツール、ゼロネットワークリクエスト
+
+## 僕からの他のもの
+
+- [anipotts.com/thoughts](https://anipotts.com/thoughts) · ロングフォーム
 - [buttondown.com/anipotts](https://buttondown.com/anipotts) · ニュースレター
-- [@anipottsbuilds](https://instagram.com/anipottsbuilds) · 短編
+- [@anipottsbuilds](https://instagram.com/anipottsbuilds) · ショートフォーム
 
 ---
 
-MIT &middot; [anipotts](https://anipotts.com)が作成
+MIT &middot; [anipotts](https://anipotts.com)による
 
-<!-- translated from README.md @ 25b25ac -->
+<!-- translated from README.md @ 925abe7 -->
