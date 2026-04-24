@@ -1,3 +1,5 @@
+<!-- tested with: claude code v2.1.118 -->
+
 # ai review rubric
 
 canonical review contract for the ai-review-team workflow. every reviewer (claude, codex, future ones) reads this before posting a review. the rubric is what makes dual-reviewer output consistent instead of two different bots shouting past each other.
@@ -94,8 +96,28 @@ the reviewer does not post these. count them in the dismissed summary only.
 
 overlap is fine when both reviewers spot the same issue; the rubric's `apply` / `blocking` dedup is by `path:line`.
 
+## issue triage
+
+when mentioned on a new issue, post a single comment in this exact shape:
+
+```
+## triage
+
+- category: bug | feature | docs | question | other
+- priority: p0 | p1 | p2 | p3
+- summary: one paragraph, no filler
+
+## next steps
+
+- [ ] concrete first action (who does what)
+- [ ] concrete second action
+- [ ] concrete third action (optional)
+```
+
+voice rules from the top of this file still apply. no em dashes, no marketing adjectives, lowercase trademarks. priority guidance: p0 = broken main path, p1 = blocks a user this week, p2 = nice to have, p3 = someday.
+
 ## frequency + trigger
 
-- opened, synchronize, reopened, ready_for_review on pull_request.
+- opened, ready_for_review on pull_request (draft prs skipped).
 - opened on issues (claude only; codex focuses on code).
 - manual trigger via `workflow_dispatch` for re-review.

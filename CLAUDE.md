@@ -1,3 +1,5 @@
+<!-- tested with: claude code v2.1.118 -->
+
 # claude-code-tips
 
 personal claude code setup, open source. hooks, example agents/commands, opinionated docs. marketplace name: `cc` (install via `anipotts@cc`).
@@ -37,3 +39,7 @@ personal claude code setup, open source. hooks, example agents/commands, opinion
 - `content/` is GITIGNORED · personal drafts, never commit
 - `data/` is GITIGNORED · local mining data, never commit
 - private dev files live in `handoffs/` and stay local
+
+## Review conventions
+
+when reviewing pull requests or issues, read and follow .github/AI_REVIEW_RUBRIC.md exactly. four buckets (blocking / apply / discuss / dismissed), exact output format, auto-dismiss list for voice-conflicting style nits.
