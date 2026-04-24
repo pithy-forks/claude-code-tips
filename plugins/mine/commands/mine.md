@@ -8,5 +8,6 @@ allowed-tools:
   - CronDelete
   - CronList
 ---
+<!-- tested with: claude code v2.1.118 -->
 
 Read the prompt file at `${CLAUDE_PLUGIN_ROOT}/prompts/mine.md` and follow its instructions completely to handle this /mine request. The user's intent comes from whatever they typed after `/mine`.

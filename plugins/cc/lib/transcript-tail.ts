@@ -1,3 +1,4 @@
+// tested with: claude code v2.1.118
 import * as fs from "node:fs";
 import * as path from "node:path";
 import * as os from "node:os";
