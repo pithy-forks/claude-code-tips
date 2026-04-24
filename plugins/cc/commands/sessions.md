@@ -3,6 +3,7 @@ name: sessions
 description: session mesh for claude code (email-cc semantics). see live sessions, send messages, broadcast status, subscribe to topics
 model: haiku
 ---
+<!-- tested with: claude code v2.1.118 -->
 
 Use the `cc` MCP tool. One tool, verb dispatch via the `action` argument.
 

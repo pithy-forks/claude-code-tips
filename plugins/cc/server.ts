@@ -1,4 +1,5 @@
 #!/usr/bin/env npx tsx
+// tested with: claude code v2.1.118
 /**
  * cc v2 MCP server: session mesh for Claude Code (Gmail-cc semantics).
  *

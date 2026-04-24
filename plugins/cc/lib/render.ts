@@ -1,3 +1,4 @@
+// tested with: claude code v2.1.118
 // Renders a Digest into a plain-text block suitable for hook additionalContext injection.
 // Empty if nothing to say; caller skips the hook output when this returns "".
 

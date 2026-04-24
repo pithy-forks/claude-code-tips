@@ -1,3 +1,5 @@
+<!-- tested with: claude code v2.1.118 -->
+
 # mine
 
 claude code plugin that mines every session into a local sqlite database.

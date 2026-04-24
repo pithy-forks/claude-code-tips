@@ -180,7 +180,6 @@ jobs:
   # ---------------------------------------------------------------------------
   version-stamps:
     runs-on: ubuntu-latest
-    continue-on-error: true
     steps:
       - uses: actions/checkout@v6
 
@@ -191,7 +190,6 @@ jobs:
           dirs="docs hooks plugins examples/agents examples/commands skills"
 
           echo "Checking for 'tested with' stamps..."
-          echo "(this is aspirational -- failures here are informational)"
           echo "---"
 
           for dir in $dirs; do
@@ -199,9 +197,26 @@ jobs:
               continue
             fi
 
-            # check tracked files (skip .json -- JSON has no comment syntax)
+            # check tracked files. skip:
+            # - *.json (no comment syntax)
+            # - *.jsonl (data fixtures)
+            # - *.sql (data schema)
+            # - *.toml (config, no stable comment convention here)
+            # - */.gitignore, */.gitleaks.toml (tooling config)
+            # - */tests/** (test infrastructure, not user-facing)
+            # - */__init__.py (empty package markers)
+            # - docs/rfcs/** (draft design docs, version-independent)
             while IFS= read -r file; do
-              case "$file" in *.json) continue ;; esac
+              case "$file" in
+                *.json) continue ;;
+                *.jsonl) continue ;;
+                *.sql) continue ;;
+                *.toml) continue ;;
+                */.gitignore) continue ;;
+                */tests/*) continue ;;
+                */__init__.py) continue ;;
+                docs/rfcs/*) continue ;;
+              esac
               checked=$((checked + 1))
               if grep -qiE 'tested.with|compatible.with|works.with|verified.with' "$file" 2>/dev/null; then
                 echo "ok: $file"
