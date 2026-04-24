@@ -44,3 +44,7 @@ side-by-side pricing for all tools in one table: [pricing.md](pricing.md)
 - [gemini API pricing](https://ai.google.dev/gemini-api/docs/pricing)
 - [google AI subscriptions](https://gemini.google/subscriptions/)
 - [antigravity](https://antigravity.google/pricing)
+
+---
+
+note: upstream tool versions and pricing verified as of april 2026. claude code ecosystem changes frequently. run `claude --version` to confirm your local version against "tested with" stamps in individual docs.
