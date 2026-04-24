@@ -14,12 +14,13 @@
 ### versions
 - `plugins/cc/.claude-plugin/plugin.json`, `plugins/cc/server.ts`, and top-level `.claude-plugin/plugin.json` aligned to 2.1.0 to match marketplace metadata
 
-### pulse plugin
+### fuel plugin
 - resurrected as the third plugin in the marketplace (shipped briefly as v1.0.0 earlier in april, orphaned during the cc rewrite)
 - three meters: 5-hour session window, 7-day rolling weekly cap, and current conversation's 200k context. driven off the statusline stdin JSON (the only programmatic surface anthropic exposes for rate limits)
-- pattern: statusline writes `~/.claude/.pulse_cache`, UserPromptSubmit hook reads cache and injects threshold-tier text into additionalContext. silent under 60%, compact meter line 60-80%, proactive nudge 80-90%, personalized p50 from mine.db 90-95%, dramatic intervention + handoff suggestion 95%+
-- command surface: `/pulse state` reads the cache directly, `/pulse handoff` drafts a clean stopping point + next-session opening prompt, `/pulse quiet` and `/pulse loud` toggle suppression via a flag file
+- pattern: statusline writes `~/.claude/.fuel_cache`, UserPromptSubmit hook reads cache and injects threshold-tier text into additionalContext. silent under 60%, compact meter line 60-80%, proactive nudge 80-90%, personalized p50 from mine.db 90-95%, dramatic intervention + handoff suggestion 95%+
+- command surface: `/fuel state` reads the cache directly, `/fuel handoff` drafts a clean stopping point + next-session opening prompt, `/fuel quiet` and `/fuel loud` toggle suppression via a flag file
 - version bumped to 2.1.0 to align with this marketplace release. em dashes removed, version stamps refreshed to v2.1.118
+- shipped as `pulse` earlier in the day, renamed to `fuel` before release.
 
 ### slash command UX
 - plugin slash command renamed from `/cc:cc` to `/cc:sessions` (removes the ugly duplicate-name form in the slash menu)

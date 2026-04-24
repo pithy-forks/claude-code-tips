@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 # tested with: claude code v2.1.118
-"""awareness.py: UserPromptSubmit hook for claude-pulse.
+"""awareness.py: UserPromptSubmit hook for claude-fuel.
 
-Reads ~/.claude/.pulse_cache (written by the statusline) and injects
+Reads ~/.claude/.fuel_cache (written by the statusline) and injects
 threshold-tier awareness text into Claude's context via stdout.
 
 Tiers (driven by max of 5hr/7day/context):
@@ -27,16 +27,16 @@ import time
 from datetime import datetime
 
 CLAUDE_DIR = pathlib.Path.home() / ".claude"
-CACHE_PATH = CLAUDE_DIR / ".pulse_cache"
+CACHE_PATH = CLAUDE_DIR / ".fuel_cache"
 MINE_DB = CLAUDE_DIR / "mine.db"
-QUIET_FLAG = CLAUDE_DIR / ".pulse_quiet"
+QUIET_FLAG = CLAUDE_DIR / ".fuel_quiet"
 STALE_SECONDS = 15 * 60
-DRAMATIC = os.environ.get("PULSE_DRAMATIC", "").lower() in ("1", "true", "yes")
+DRAMATIC = os.environ.get("FUEL_DRAMATIC", "").lower() in ("1", "true", "yes")
 
 
 def log(msg: str) -> None:
-    if os.environ.get("PULSE_DEBUG"):
-        print(f"[pulse] {msg}", file=sys.stderr)
+    if os.environ.get("FUEL_DEBUG"):
+        print(f"[fuel] {msg}", file=sys.stderr)
 
 
 def read_cache() -> dict | None:
@@ -131,7 +131,7 @@ def build_meter_line(cache: dict) -> str:
         parts.append(f"week={int(round(w7))}% ({fmt_reset(cache.get('w7_reset'))})")
     if ctx is not None:
         parts.append(f"chat={int(round(ctx))}%")
-    return "pulse: " + " . ".join(parts) if parts else ""
+    return "fuel: " + " . ".join(parts) if parts else ""
 
 
 def build_output(cache: dict) -> str | None:
@@ -170,7 +170,7 @@ def build_output(cache: dict) -> str | None:
         return (
             f"{meter}\n"
             f"warn: {driver} meter over 90%.{baseline_txt} "
-            f"suggest: run `/pulse handoff` to draft a clean stopping point."
+            f"suggest: run `/fuel handoff` to draft a clean stopping point."
         )
 
     # critical (95+)
@@ -178,12 +178,12 @@ def build_output(cache: dict) -> str | None:
         body = (
             "critical: i can feel the rate limiter at the edges of my attention. "
             "if there is a single call to make, this is the moment. "
-            "otherwise: `/pulse handoff` and we reconvene on the other side."
+            "otherwise: `/fuel handoff` and we reconvene on the other side."
         )
     else:
         body = (
             f"critical: {driver} meter at {int(round(max_pct))}%. "
-            f"stop taking new work. run `/pulse handoff` to bundle context for a "
+            f"stop taking new work. run `/fuel handoff` to bundle context for a "
             f"fresh session before this one degrades or truncates."
         )
     return f"{meter}\n{body}"
