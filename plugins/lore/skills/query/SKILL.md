@@ -1,10 +1,14 @@
 ---
-name: mine
-description: your usage data - sessions, costs, tools, projects, search, and patterns
+name: query
+description: query the lore knowledge graph for sessions, costs, tools, projects, search, and patterns
 tools: Bash, Read, AskUserQuestion, CronCreate, CronDelete, CronList
 ---
-When the user runs /mine, interpret their intent and query ~/.claude/mine.db accordingly.
-<!-- tested with: claude code v2.1.81 -->
+When the user runs /lore (or asks anything that requires reading their session history), interpret their intent and query the lore SQLite database accordingly. The database lives at ~/.claude/lore/lore.db (v2.0+) with a fallback at ~/.claude/mine.db (v1.x). All queries below read from the resolved path.
+<!-- tested with: claude code v2.1.118 -->
+
+## ALWAYS use the absolute path
+
+When constructing sqlite3 queries below, ALWAYS use the absolute path. Bare `mine.db` or `lore.db` (without the directory) will create empty stub files in the current working directory. Set `DB="$HOME/.claude/lore/lore.db"; [ -f "$DB" ] || DB="$HOME/.claude/mine.db"` once at the top of any heredoc and use `$DB` everywhere.
 
 ## Step 0: Check database exists and is fresh
 
@@ -16,7 +20,8 @@ command -v sqlite3 >/dev/null 2>&1 || MISSING="$MISSING sqlite3"
 command -v python3 >/dev/null 2>&1 || MISSING="$MISSING python3"
 if [ -n "$MISSING" ]; then echo "MISSING_DEPS|$MISSING"; exit 0; fi
 
-DB=~/.claude/mine.db
+DB="$HOME/.claude/lore/lore.db"
+[ -f "$DB" ] || DB="$HOME/.claude/mine.db"
 if [ ! -f "$DB" ]; then echo "NO_DB"; exit 0; fi
 LATEST=$(sqlite3 -noheader "$DB" "SELECT MAX(start_time) FROM sessions WHERE is_subagent = 0;" 2>/dev/null)
 TOTAL=$(sqlite3 -noheader "$DB" "SELECT COUNT(*) FROM sessions WHERE is_subagent = 0;" 2>/dev/null)
@@ -24,7 +29,7 @@ FIRST=$(sqlite3 -noheader "$DB" "SELECT MIN(start_time) FROM sessions WHERE is_s
 NEWEST_JSONL=$(find ~/.claude/projects -name "*.jsonl" -newer "$DB" 2>/dev/null | head -1)
 if [ -n "$NEWEST_JSONL" ]; then
   echo "STALE|$FIRST|$LATEST|$TOTAL"
-  for p in ./scripts/mine.py $(find ~/.claude/plugins -path "*/mine/scripts/mine.py" 2>/dev/null | head -1); do
+  for p in ./scripts/mine.py $(find ~/.claude/plugins -path "*/lore/scripts/mine.py" 2>/dev/null | head -1); do
     if [ -f "$p" ]; then python3 "$p" --incremental 2>&1; break; fi
   done
   LATEST=$(sqlite3 -noheader "$DB" "SELECT MAX(start_time) FROM sessions WHERE is_subagent = 0;" 2>/dev/null)
@@ -37,25 +42,27 @@ fi
 `````
 
 - If MISSING_DEPS: tell user how to install (`sqlite3` ships with macOS; `python3` via brew/python.org)
-- If NO_DB: find and run mine.py (`./scripts/mine.py` or search `~/.claude/plugins/*/mine/scripts/mine.py`). Use `--incremental`. If mine.py not found, explain: `python3 scripts/mine.py` parses `~/.claude/projects/` JSONL logs into `~/.claude/mine.db`
+- If NO_DB: find and run mine.py (`./scripts/mine.py` or search `~/.claude/plugins/*/lore/scripts/mine.py`). Use `--incremental`. If mine.py not found, explain: `python3 scripts/mine.py` parses `~/.claude/projects/` JSONL logs into `~/.claude/lore/lore.db`
 - If STALE: backfill ran automatically, note briefly then proceed
 - If FRESH: proceed
 
 ## Step 0.5: Scope detection
 
 `````bash
+DB="$HOME/.claude/lore/lore.db"
+[ -f "$DB" ] || DB="$HOME/.claude/mine.db"
 CWD_SAFE="${PWD//\'/\'\'}"
-MATCH=$(sqlite3 -noheader ~/.claude/mine.db "SELECT project_name, COUNT(*) FROM sessions WHERE (project_dir = '$CWD_SAFE' OR cwd = '$CWD_SAFE') AND is_subagent = 0 GROUP BY project_name ORDER BY COUNT(*) DESC LIMIT 1;" 2>/dev/null)
+MATCH=$(sqlite3 -noheader "$DB" "SELECT project_name, COUNT(*) FROM sessions WHERE (project_dir = '$CWD_SAFE' OR cwd = '$CWD_SAFE') AND is_subagent = 0 GROUP BY project_name ORDER BY COUNT(*) DESC LIMIT 1;" 2>/dev/null)
 if [ -z "$MATCH" ]; then
   PROJECT=$(basename "$PWD" | tr -dc 'a-zA-Z0-9._-')
-  MATCH=$(sqlite3 -noheader ~/.claude/mine.db "SELECT project_name, COUNT(*) FROM sessions WHERE project_name = '$PROJECT' AND is_subagent = 0 GROUP BY project_name LIMIT 1;" 2>/dev/null)
+  MATCH=$(sqlite3 -noheader "$DB" "SELECT project_name, COUNT(*) FROM sessions WHERE project_name = '$PROJECT' AND is_subagent = 0 GROUP BY project_name LIMIT 1;" 2>/dev/null)
 fi
 echo "SCOPE|$MATCH"
 `````
 
 - If user names a project explicitly, scope to that project
 - If user says "global" or "all", scope globally
-- If cwd matches a project in mine.db, default to project scope
+- If cwd matches a project in lore.db, default to project scope
 - Otherwise default to global
 - When project-scoped, add `AND project_name = '<project>'` to WHERE clauses
 
@@ -72,7 +79,7 @@ Three core intents, plus search and freeform. If no argument is given, show the 
 The answer to "what's happening?" Recent activity, where compute goes, whether sessions are productive.
 
 `````bash
-sqlite3 -header -separator '|' ~/.claude/mine.db <<'SQL'
+sqlite3 -header -separator '|' "$DB" <<'SQL'
 -- summary (7d)
 SELECT 'SUMMARY' s, COUNT(*) sessions,
   ROUND(SUM(duration_active_seconds) / 3600.0, 1) active_hrs,
@@ -119,7 +126,7 @@ The answer to "what happened?" Full-text search across every conversation.
 
 `````bash
 TERM='<escaped_search_term>'
-sqlite3 -header -separator '|' ~/.claude/mine.db <<SQL
+sqlite3 -header -separator '|' "$DB" <<SQL
 SELECT m.session_id, s.project_name, s.start_time, m.role,
        snippet(messages_fts, 0, '>>>', '<<<', '...', 40) AS match
 FROM messages_fts
@@ -145,7 +152,7 @@ Escape single quotes by doubling them. Wrap search term in double quotes inside 
 The answer to "am I using this well?" Measures session OUTCOMES, not individual tool errors. A session's health is determined by what it produced, not which commands failed.
 
 `````bash
-sqlite3 -header -separator '|' ~/.claude/mine.db <<'SQL'
+sqlite3 -header -separator '|' "$DB" <<'SQL'
 -- session outcome classification (last 30 days)
 WITH session_outcomes AS (
   SELECT

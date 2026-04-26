@@ -25,10 +25,34 @@ from typing import Callable
 # ---------------------------------------------------------------------------
 
 CLAUDE_DIR = pathlib.Path.home() / ".claude"
-DB_PATH = CLAUDE_DIR / "mine.db"
-CONFIG_PATH = CLAUDE_DIR / "mine.json"
+LORE_DIR = CLAUDE_DIR / "lore"
+LEGACY_DB_PATH = CLAUDE_DIR / "mine.db"  # pre-v2.0
+LEGACY_CONFIG_PATH = CLAUDE_DIR / "mine.json"  # pre-v2.0
+DB_PATH = LORE_DIR / "lore.db"
+CONFIG_PATH = LORE_DIR / "config.json"
 HOOK_DIR = pathlib.Path(__file__).resolve().parent
 SCRIPTS_DIR = HOOK_DIR.parent / "scripts"
+
+
+def _resolve_db_path() -> pathlib.Path:
+    """Lore v2.0 stores db at ~/.claude/lore/lore.db. v1.x stored it at
+    ~/.claude/mine.db. If only the legacy path exists, return that so the
+    plugin keeps working before its first ingest writes the new file.
+    Migration to the new location happens on the next mine.py invocation."""
+    if DB_PATH.exists():
+        return DB_PATH
+    if LEGACY_DB_PATH.exists():
+        return LEGACY_DB_PATH
+    return DB_PATH
+
+
+def _resolve_config_path() -> pathlib.Path:
+    """Same dual-path logic as the db: prefer the new location, fall back."""
+    if CONFIG_PATH.exists():
+        return CONFIG_PATH
+    if LEGACY_CONFIG_PATH.exists():
+        return LEGACY_CONFIG_PATH
+    return CONFIG_PATH
 
 
 # ---------------------------------------------------------------------------
@@ -36,9 +60,10 @@ SCRIPTS_DIR = HOOK_DIR.parent / "scripts"
 # ---------------------------------------------------------------------------
 
 def load_config() -> dict:
-    """Load mine.json config. Returns empty dict if missing or invalid."""
+    """Load lore config (lore/config.json or legacy mine.json). Empty dict if missing."""
+    path = _resolve_config_path()
     try:
-        return json.loads(CONFIG_PATH.read_text()) if CONFIG_PATH.exists() else {}
+        return json.loads(path.read_text()) if path.exists() else {}
     except (json.JSONDecodeError, OSError):
         return {}
 
@@ -49,10 +74,11 @@ def is_enabled(config: dict, feature: str) -> bool:
 
 
 def db_connect(apply_schema: bool = False) -> sqlite3.Connection | None:
-    """Connect to mine.db with WAL mode and 5s timeout. None if DB missing."""
-    if not DB_PATH.exists():
+    """Connect to lore.db (or legacy mine.db) with WAL + 5s timeout. None if missing."""
+    path = _resolve_db_path()
+    if not path.exists():
         return None
-    conn = sqlite3.connect(str(DB_PATH), timeout=5)
+    conn = sqlite3.connect(str(path), timeout=5)
     conn.execute("PRAGMA journal_mode=WAL")
     if apply_schema:
         schema_file = SCRIPTS_DIR / "schema.sql"
@@ -319,17 +345,37 @@ def handle_startup(payload: dict, config: dict) -> None:
     project_name is derived from basename(cwd) — this matches how mine.py derives it
     from the JSONL metadata field, which is also the directory basename.
     """
-    # one-time migration: miner -> mine
-    old_db = CLAUDE_DIR / "miner.db"
-    if old_db.exists() and not DB_PATH.exists():
-        old_db.rename(DB_PATH)
-        old_config = CLAUDE_DIR / "miner.json"
-        if old_config.exists():
-            old_config.rename(CONFIG_PATH)
-        old_ignore = CLAUDE_DIR / ".minerignore"
-        if old_ignore.exists():
-            old_ignore.rename(CLAUDE_DIR / ".mineignore")
-        context("[mine] migrated miner.db -> mine.db")
+    # one-time migrations to the v2.0 ~/.claude/lore/ subdirectory layout.
+    # historical names (miner -> mine -> lore) all funnel into lore.db.
+    LORE_DIR.mkdir(parents=True, exist_ok=True)
+    if not DB_PATH.exists():
+        # try miner.db first (oldest), then mine.db (v1.x), in priority order.
+        for legacy_name in ("miner.db", "mine.db"):
+            candidate = CLAUDE_DIR / legacy_name
+            if candidate.exists():
+                candidate.rename(DB_PATH)
+                # companions
+                for suffix in ("-shm", "-wal"):
+                    legacy_companion = pathlib.Path(str(candidate) + suffix)
+                    new_companion = pathlib.Path(str(DB_PATH) + suffix)
+                    if legacy_companion.exists():
+                        legacy_companion.rename(new_companion)
+                context(f"[lore] migrated {legacy_name} -> ~/.claude/lore/lore.db")
+                break
+    # config + ignore file follow the same pattern
+    if not CONFIG_PATH.exists():
+        for legacy_name in ("miner.json", "mine.json"):
+            candidate = CLAUDE_DIR / legacy_name
+            if candidate.exists():
+                candidate.rename(CONFIG_PATH)
+                break
+    legacy_ignore = LORE_DIR / ".loreignore"
+    if not legacy_ignore.exists():
+        for legacy_name in (".minerignore", ".mineignore"):
+            candidate = CLAUDE_DIR / legacy_name
+            if candidate.exists():
+                candidate.rename(legacy_ignore)
+                break
 
     # apply_schema=True ensures views exist (user_session_costs, user_tool_calls, etc.)
     conn = db_connect(apply_schema=True)

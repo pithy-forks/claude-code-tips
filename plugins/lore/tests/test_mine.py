@@ -887,24 +887,30 @@ class TestIncrementalFilter:
 
 class TestFileDiscoveryHelpers:
     def test_load_mineignore_missing_file(self):
-        original = mine.MINEIGNORE_PATH
-        mine.MINEIGNORE_PATH = pathlib.Path("/nonexistent/.mineignore")
+        original_legacy = mine.LEGACY_IGNORE_PATH
+        original_lore = mine.LOREIGNORE_PATH
+        mine.LEGACY_IGNORE_PATH = pathlib.Path("/nonexistent/.mineignore")
+        mine.LOREIGNORE_PATH = pathlib.Path("/nonexistent/.loreignore")
         try:
             result = mine.load_mineignore()
             assert result == []
         finally:
-            mine.MINEIGNORE_PATH = original
+            mine.LEGACY_IGNORE_PATH = original_legacy
+            mine.LOREIGNORE_PATH = original_lore
 
     def test_load_mineignore_with_content(self, tmp_path):
-        ignore_file = tmp_path / ".mineignore"
+        ignore_file = tmp_path / ".loreignore"
         ignore_file.write_text("# comment\npattern1\npattern2\n\n")
-        original = mine.MINEIGNORE_PATH
-        mine.MINEIGNORE_PATH = ignore_file
+        original_legacy = mine.LEGACY_IGNORE_PATH
+        original_lore = mine.LOREIGNORE_PATH
+        mine.LOREIGNORE_PATH = ignore_file
+        mine.LEGACY_IGNORE_PATH = pathlib.Path("/nonexistent/.mineignore")
         try:
             result = mine.load_mineignore()
             assert result == ["pattern1", "pattern2"]
         finally:
-            mine.MINEIGNORE_PATH = original
+            mine.LEGACY_IGNORE_PATH = original_legacy
+            mine.LOREIGNORE_PATH = original_lore
 
     def test_should_ignore_matches(self):
         assert mine.should_ignore("my-secret-project", ["secret"]) is True

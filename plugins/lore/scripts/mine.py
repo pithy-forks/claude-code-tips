@@ -44,9 +44,53 @@ from typing import Any
 
 CLAUDE_DIR = pathlib.Path.home() / ".claude"
 PROJECTS_DIR = CLAUDE_DIR / "projects"
-DEFAULT_DB_PATH = CLAUDE_DIR / "mine.db"
+LORE_DIR = CLAUDE_DIR / "lore"
+LEGACY_DB_PATH = CLAUDE_DIR / "mine.db"  # pre-v2.0 location (migration source)
+DEFAULT_DB_PATH = LORE_DIR / "lore.db"
 SCHEMA_PATH = pathlib.Path(__file__).resolve().parent / "schema.sql"
-MINEIGNORE_PATH = CLAUDE_DIR / ".mineignore"
+LEGACY_IGNORE_PATH = CLAUDE_DIR / ".mineignore"  # pre-v2.0 location
+LOREIGNORE_PATH = LORE_DIR / ".loreignore"
+
+
+def resolve_ignore_path() -> pathlib.Path:
+    """Prefer the new location; fall back to legacy if user hasn't migrated."""
+    if LOREIGNORE_PATH.exists():
+        return LOREIGNORE_PATH
+    if LEGACY_IGNORE_PATH.exists():
+        return LEGACY_IGNORE_PATH
+    return LOREIGNORE_PATH
+
+
+def migrate_legacy_db_if_needed() -> tuple[pathlib.Path, bool]:
+    """If the new lore.db doesn't exist but the legacy mine.db does, copy
+    on first launch. Old file is kept as backup; user removes when ready.
+    Returns (active_db_path, did_migrate)."""
+    if DEFAULT_DB_PATH.exists():
+        return DEFAULT_DB_PATH, False
+    LORE_DIR.mkdir(parents=True, exist_ok=True)
+    if not LEGACY_DB_PATH.exists():
+        return DEFAULT_DB_PATH, False
+    import shutil
+    shutil.copy2(str(LEGACY_DB_PATH), str(DEFAULT_DB_PATH))
+    for suffix in ("-shm", "-wal"):
+        legacy_companion = pathlib.Path(str(LEGACY_DB_PATH) + suffix)
+        new_companion = pathlib.Path(str(DEFAULT_DB_PATH) + suffix)
+        if legacy_companion.exists() and not new_companion.exists():
+            shutil.copy2(str(legacy_companion), str(new_companion))
+    print(
+        f"[lore] migrated legacy database: {LEGACY_DB_PATH} -> {DEFAULT_DB_PATH}",
+        file=sys.stderr,
+    )
+    print(
+        "[lore] legacy file kept as backup; remove manually when satisfied.",
+        file=sys.stderr,
+    )
+    return DEFAULT_DB_PATH, True
+
+
+# kept under the legacy name for backward source-import compatibility; new
+# code should reference resolve_ignore_path() instead.
+MINEIGNORE_PATH = LEGACY_IGNORE_PATH
 
 # Content preview limits
 USER_PREVIEW_LIMIT = 2000
@@ -547,11 +591,13 @@ def parse_jsonl_file(args: tuple[str, bool]) -> dict[str, Any]:
 # ---------------------------------------------------------------------------
 
 def load_mineignore() -> list[str]:
-    """Load patterns from ~/.claude/.mineignore (one per line)."""
-    if not MINEIGNORE_PATH.exists():
+    """Load patterns from the lore ignore file (one per line). Tries
+    ~/.claude/lore/.loreignore first, falls back to legacy ~/.claude/.mineignore."""
+    path = resolve_ignore_path()
+    if not path.exists():
         return []
     patterns: list[str] = []
-    with open(MINEIGNORE_PATH, "r") as f:
+    with open(path, "r") as f:
         for line in f:
             line = line.strip()
             if line and not line.startswith("#"):
@@ -1488,7 +1534,12 @@ def main() -> None:
 
     args = parser.parse_args()
 
-    db_path = pathlib.Path(args.db) if args.db else DEFAULT_DB_PATH
+    if args.db:
+        db_path = pathlib.Path(args.db)
+    else:
+        # First call decides: if legacy mine.db exists and lore.db doesn't,
+        # migrate by copy (legacy kept as backup). Otherwise use lore.db.
+        db_path, _ = migrate_legacy_db_if_needed()
     worker_count = args.workers or multiprocessing.cpu_count()
 
     # ---- Handle action-only flags ----
