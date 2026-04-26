@@ -19,7 +19,7 @@ Claude Code burns through three caps simultaneously: the **5-hour session window
 
 Plus a `/fuel` slash command for direct inspection and clean handoffs.
 
-## Install (requires Claude Code v2.1.80+)
+## Install (requires Claude Code v2.1.80+, tested with v2.1.118)
 
 Two steps.
 

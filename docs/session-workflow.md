@@ -1,3 +1,5 @@
+<!-- tested with: claude code v2.1.118 -->
+
 # how i start a session
 
 how i actually start a claude code session.
@@ -65,5 +67,3 @@ nothing to do manually. close the terminal. the data is there when you need it.
 
 - [hooks](./hooks.md) -- the hooks that fire during sessions
 - [cost](./cost.md) -- session cost patterns and optimization
-
-tested with: claude code v2.1.118

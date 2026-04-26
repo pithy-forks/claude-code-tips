@@ -1,3 +1,5 @@
+<!-- tested with: claude code v2.1.118 -->
+
 # mistakes i made
 
 hundreds of sessions across dozens of projects. here are the mistakes i keep making -- and the fixes.
@@ -66,5 +68,3 @@ the value isn't seeing individual errors. it's seeing which errors are *systemat
 
 - [mine plugin](https://github.com/anipotts/mine) -- full feature docs including mistakes, search, burn
 - [hooks](./hooks.md) -- the enforcement hooks that prevent recurring mistakes
-
-tested with: claude code v2.1.118
