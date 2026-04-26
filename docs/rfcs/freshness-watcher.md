@@ -39,7 +39,7 @@ each PR opened by the watcher is tagged with a rule category. CI gates on the ca
 - changelog mentions new features (regex on "new", "added", "support for", "introduces").
 - changelog mentions deprecations or breaking changes.
 - content updates to `docs/tips/` or `docs/comparisons/` where wording might need Ani's voice.
-- anything touching `plugins/cc/server.ts`, `plugins/mine/hooks/hook.py`, or any runtime hook script under `hooks/`.
+- anything touching `plugins/cc/server.ts`, `plugins/lore/hooks/hook.py`, or any runtime hook script under `hooks/`.
 
 the classifier is a small script with deterministic rules. no LLM in the critical path (adds latency, adds failure modes). LLM can draft PR body copy async, but merge decision is code.
 

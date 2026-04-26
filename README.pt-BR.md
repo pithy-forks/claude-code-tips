@@ -16,7 +16,7 @@ novo aqui? comece com o [índice de dicas](./docs/tips/) ou dê uma olhada em [h
 
 três plugins, um marketplace.
 
-- **`mine@cc`** toda sessão minerada em sqlite. consulte custos, ferramentas, erros, pontos quentes, loops e busca de texto completo no seu próprio histórico. tudo local.
+- **`lore@cc`** toda sessão minerada em sqlite. consulte custos, ferramentas, erros, pontos quentes, loops e busca de texto completo no seu próprio histórico. tudo local.
 - **`cc@cc`** consciência entre sessões e mensagens. além de um subsistema `time`: `/cc:time-estimate` fornece estimativas de tempo realistas de claude code baseadas no seu histórico de sessões, não em palpites otimistas.
 - **`fuel@cc`** medidor de combustível de 3 metros (sessão de 5 horas, semanal de 7 dias, 200k de contexto). hook pré-turno incentiva claude em direção a handoffs mais limpos conforme os medidores enchem. `/fuel state` lê-os diretamente; `/fuel handoff` elabora um ponto de parada.
 
@@ -30,7 +30,7 @@ seu tempo: ~15 min review
 
 ```bash
 /plugin marketplace add anipotts/claude-code-tips   # adicionar marketplace (uma vez)
-/plugin install mine@cc                             # instalar mine (análise de sessão)
+/plugin install lore@cc                             # instalar lore (análise de sessão)
 /plugin install cc@cc                               # instalar cc (mensagens entre sessões)
 ```
 
@@ -48,25 +48,25 @@ o mesmo uso custaria ~$12K na API com caching, ~$95K sem. sem loops autônomos. 
 
 ---
 
-## instale o plugin mine
+## instale o plugin lore
 
 ```bash
 /plugin marketplace add anipotts/claude-code-tips   # adicionar marketplace (uma vez)
-/plugin install mine@cc                             # instalar mine (análise de sessão)
+/plugin install lore@cc                             # instalar lore (análise de sessão)
 /plugin install cc@cc                               # instalar cc (mensagens entre sessões)
 ```
 
-você obtém **[mine](./plugins/mine/)** · mineração de sessão para sqlite. custos, busca, memória de erros, detecção de padrões. todos os dados ficam locais em `~/.claude/mine.db`.
+você obtém **[lore](./plugins/lore/)** · mineração de sessão para sqlite. custos, busca, memória de erros, detecção de padrões. todos os dados ficam locais em `~/.claude/lore/lore.db`.
 
 ```
-/mine                     sessões de hoje, custo, ferramentas principais
-/mine search "websocket"  busca de texto completo em todas as conversas
-/mine mistakes            padrões de erro que claude continua repetindo
-/mine hotspots            arquivos mais editados em todas as sessões
-/mine loops               padrões repetidos em todas as sessões
+/lore                     sessões de hoje, custo, ferramentas principais
+/lore search "websocket"  busca de texto completo em todas as conversas
+/lore mistakes            padrões de erro que claude continua repetindo
+/lore hotspots            arquivos mais editados em todas as sessões
+/lore loops               padrões repetidos em todas as sessões
 ```
 
-comece com `mine` + o hook `safety-guard`. adicione mais conforme avança. **[documentação de mine &rarr;](./plugins/mine/)**
+comece com `lore` + o hook `safety-guard`. adicione mais conforme avança. **[documentação de lore &rarr;](./plugins/lore/)**
 
 ---
 
@@ -82,7 +82,7 @@ mensagens entre sessões e subsistema `time`. veja o que outras sessões de Clau
 /cc                             mostrar sessões ativas
 /cc send merizo "pause"         enviar mensagem para outra sessão
 /cc:time-estimate <task>        estimativa CC em intervalo, usa seu modelo atual + esforço
-/cc:time-calibrate              diff throughput real (de mine.db) contra a regra
+/cc:time-calibrate              diff throughput real (de lore.db) contra a regra
 /cc:time-benchmark              A/B/C guiado em níveis de esforço no seu modelo
 ```
 
@@ -172,7 +172,7 @@ copie para `.claude/agents/` e invoque com `/agent <name>`. cada um ensina um pa
 
 | comando | o que faz |
 |---|---|
-| `/mine` | dados de uso · custos, sessões, busca, padrões |
+| `/lore` | dados de uso · custos, sessões, busca, padrões |
 | `/ship` | stage, commit, push, abrir PR em um comando |
 | `/improve` | propor atualizações de CLAUDE.md do histórico git |
 
@@ -225,7 +225,7 @@ este repositório é executado com seus próprios padrões.
 
 todas saíram de viver em Claude Code todos os dias. cada uma resolve um problema específico que continuava acontecendo.
 
-- **[mine](./plugins/mine/)** · mineração de sessão para sqlite. custos, busca, memória de erros, detecção de padrões
+- **[lore](./plugins/lore/)** · mineração de sessão para sqlite. custos, busca, memória de erros, detecção de padrões
 - **[claudemon](https://github.com/anipotts/claudemon)** · monitoramento de sessão em tempo real em projetos e máquinas
 - **[cc](./plugins/cc/)** · consciência multi-sessão. veja o que outras sessões estão fazendo, envie mensagens entre elas
 - **[imessage-mcp](https://github.com/anipotts/imessage-mcp)** · servidor MCP para histórico de iMessage somente leitura. 26 ferramentas, zero requisições de rede
