@@ -91,10 +91,13 @@ export function startTranscriptTail(opts: {
 
   let buffer = "";
   let stopped = false;
-  let timer: NodeJS.Timeout | null = null;
+  let watcher: fs.FSWatcher | null = null;
+  let safetyTimer: NodeJS.Timeout | null = null;
+  let pending = false;
 
   const readDelta = () => {
     if (stopped) return;
+    pending = false;
     let stat: fs.Stats;
     try {
       stat = fs.statSync(file);
@@ -102,7 +105,6 @@ export function startTranscriptTail(opts: {
       return;
     }
     if (stat.size < offset) {
-      // file rotated or truncated
       offset = 0;
       buffer = "";
     }
@@ -122,7 +124,6 @@ export function startTranscriptTail(opts: {
         if (!line.trim()) continue;
         try {
           const entry = JSON.parse(line);
-          // Claude Code assistant messages nest tool_use inside entry.message.content
           const content = entry?.message?.content;
           if (Array.isArray(content)) {
             for (const block of content) {
@@ -146,15 +147,36 @@ export function startTranscriptTail(opts: {
         tx([...paths]);
       }
     } catch {
-      // transient read error; try again next tick
+      // transient read error; safety timer will retry
     }
   };
 
+  // Coalesce burst events into one read on the next macrotask.
+  const schedule = () => {
+    if (stopped || pending) return;
+    pending = true;
+    setImmediate(readDelta);
+  };
+
   readDelta();
-  timer = setInterval(readDelta, 2500);
+
+  // Primary path: filesystem watcher (FSEvents on macOS, inotify on linux).
+  // bun:sqlite + fs.watch coexist cleanly; bun's fs.watch is implemented
+  // natively. fires within ~10-50ms of an append.
+  try {
+    watcher = fs.watch(file, { persistent: false }, schedule);
+  } catch {
+    watcher = null;
+  }
+
+  // Safety-net poll: catches the rare missed event (rotation, network FS,
+  // platform quirks). 30s is slow enough to be near-free, fast enough to
+  // recover within one user turn if the watcher missed a write.
+  safetyTimer = setInterval(schedule, 30_000);
 
   return () => {
     stopped = true;
-    if (timer) clearInterval(timer);
+    watcher?.close();
+    if (safetyTimer) clearInterval(safetyTimer);
   };
 }
