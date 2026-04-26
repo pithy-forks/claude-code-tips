@@ -14,6 +14,11 @@
 # the source path always works; binaries are an opt-in optimization.
 set -eo pipefail
 
+# claude code may spawn child processes with a stripped PATH that omits
+# the homebrew + bun install dirs. prepend the canonical install paths
+# so we find bun regardless of how cc was launched.
+export PATH="${HOME}/.bun/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:${PATH:-}"
+
 ROOT="${CLAUDE_PLUGIN_ROOT:-$(cd "$(dirname "$0")/.." && pwd)}"
 DATA="${CLAUDE_PLUGIN_DATA:-}"
 
