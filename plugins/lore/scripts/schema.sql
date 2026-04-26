@@ -12,7 +12,7 @@ CREATE TABLE IF NOT EXISTS meta (
     key TEXT PRIMARY KEY,
     value TEXT
 );
-INSERT OR REPLACE INTO meta (key, value) VALUES ('schema_version', '2');
+INSERT OR REPLACE INTO meta (key, value) VALUES ('schema_version', '3');
 INSERT OR IGNORE INTO meta (key, value) VALUES ('created_at', datetime('now'));
 
 -- ============================================================
@@ -403,3 +403,51 @@ CREATE INDEX IF NOT EXISTS idx_subagents_parent ON subagents(parent_session_id);
 CREATE INDEX IF NOT EXISTS idx_parse_log_session ON parse_log(session_id);
 CREATE INDEX IF NOT EXISTS idx_project_paths_name ON project_paths(project_name);
 CREATE INDEX IF NOT EXISTS idx_model_pricing_pattern ON model_pricing(model_pattern, effective_from);
+
+-- ============================================================
+-- NOTES: user-tagged decisions, lessons, reminders (/lore:remember)
+-- ============================================================
+-- The notes table is the only knowledge-graph layer that depends on
+-- user input rather than parsed JSONL. Heuristic-derived edges
+-- (session resumes, error resolutions) are intentionally deferred until
+-- there is enough tagged data to validate them against. file_cooccurrences
+-- below is computed live from tool_calls (no extra storage).
+CREATE TABLE IF NOT EXISTS notes (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    project_name TEXT,
+    session_id TEXT,
+    file_path TEXT,
+    note_type TEXT NOT NULL DEFAULT 'note',
+    title TEXT NOT NULL,
+    body TEXT,
+    tags TEXT,
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_notes_project ON notes(project_name);
+CREATE INDEX IF NOT EXISTS idx_notes_session ON notes(session_id);
+CREATE INDEX IF NOT EXISTS idx_notes_type ON notes(note_type);
+CREATE INDEX IF NOT EXISTS idx_notes_created ON notes(created_at);
+
+-- ============================================================
+-- FILE COOCCURRENCES: pairs of files touched in the same session
+-- ============================================================
+-- Computed view, not a materialized table -- always fresh, no pipeline.
+-- Canonicalized as (file_a < file_b) so each pair appears once.
+-- session_count is the number of distinct sessions where both files were
+-- read or edited; useful for "what file usually shows up alongside X?"
+DROP VIEW IF EXISTS file_cooccurrences;
+CREATE VIEW IF NOT EXISTS file_cooccurrences AS
+SELECT
+    a.input_summary AS file_a,
+    b.input_summary AS file_b,
+    COUNT(DISTINCT a.session_id) AS session_count,
+    MAX(MAX(a.timestamp, b.timestamp)) AS last_seen
+FROM tool_calls a
+JOIN tool_calls b ON a.session_id = b.session_id
+    AND a.input_summary < b.input_summary
+WHERE a.tool_name IN ('Edit','Read','Write','MultiEdit')
+  AND b.tool_name IN ('Edit','Read','Write','MultiEdit')
+  AND a.input_summary IS NOT NULL
+  AND b.input_summary IS NOT NULL
+GROUP BY a.input_summary, b.input_summary;
