@@ -21,7 +21,19 @@ your accumulated claude code lore as a deterministic knowledge graph. every sess
 /lore:help                  full intent menu
 ```
 
-graph + remember + export commands ship in v2.0.x as the knowledge-graph layer comes online (see ROADMAP).
+knowledge-graph commands (schema v3+):
+
+```
+/lore:remember "decision: chose D1 over Supabase"  capture a decision/lesson/reminder/todo
+/lore:remember list --tag d1                        list tagged notes
+/lore:graph cooccurrence hook.py                    files that show up alongside hook.py
+/lore:graph project lore                            top files + sessions for a project
+/lore:graph summary                                 graph-wide counts
+/lore:export notes                                  json snapshot of your notes
+/lore:export project anipotts.com                   bundled json for a project
+```
+
+`/lore:remember` writes to a user-controlled `notes` table; `/lore:graph` reads the live `file_cooccurrences` view (computed from `tool_calls`, no extra storage); `/lore:export` writes portable snapshots. Session-resume edges and error-resolution edges are intentionally deferred -- they would need heuristics that are easier to validate once tagged data exists.
 
 ## how it works
 
