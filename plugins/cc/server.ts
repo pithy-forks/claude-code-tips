@@ -531,7 +531,7 @@ const tool = {
 };
 
 const server = new Server(
-  { name: "cc", version: "2.3.1" },
+  { name: "cc", version: "2.3.2" },
   { capabilities: { tools: {}, experimental: { "claude/channel": {} } } },
 );
 

@@ -1,13 +1,14 @@
 {
   "name": "cc",
-  "version": "2.3.1",
+  "version": "2.3.2",
   "description": "Session mesh for Claude Code. Email-cc semantics: every session stays informed of what its siblings are doing, with file-overlap alerts that prevent two agents silently clobbering the same file. Includes the time subsystem (rule, hook, /time-* skills).",
   "author": { "name": "Ani Potts", "url": "https://github.com/anipotts" },
   "repository": "https://github.com/anipotts/claude-code-tips",
   "license": "MIT",
   "mcpServers": {
     "cc": {
-      "command": "${CLAUDE_PLUGIN_ROOT}/bin/launch.sh"
+      "command": "bash",
+      "args": ["${CLAUDE_PLUGIN_ROOT}/bin/launch.sh"]
     }
   },
   "channels": [{ "server": "cc" }]

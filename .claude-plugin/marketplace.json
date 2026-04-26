@@ -5,7 +5,7 @@
   },
   "metadata": {
     "description": "claude code plugins by ani potts: session awareness, usage mining, and tools.",
-    "version": "2.3.1"
+    "version": "2.3.2"
   },
   "plugins": [
     {
