@@ -42,9 +42,10 @@ from typing import Any
 # Constants
 # ---------------------------------------------------------------------------
 
-CLAUDE_DIR = pathlib.Path.home() / ".claude"
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
+from _common import CLAUDE_DIR, LORE_DIR, prefer  # noqa: E402
+
 PROJECTS_DIR = CLAUDE_DIR / "projects"
-LORE_DIR = CLAUDE_DIR / "lore"
 LEGACY_DB_PATH = CLAUDE_DIR / "mine.db"  # pre-v2.0 location (migration source)
 DEFAULT_DB_PATH = LORE_DIR / "lore.db"
 SCHEMA_PATH = pathlib.Path(__file__).resolve().parent / "schema.sql"
@@ -54,38 +55,26 @@ LOREIGNORE_PATH = LORE_DIR / ".loreignore"
 
 def resolve_ignore_path() -> pathlib.Path:
     """Prefer the new location; fall back to legacy if user hasn't migrated."""
-    if LOREIGNORE_PATH.exists():
-        return LOREIGNORE_PATH
-    if LEGACY_IGNORE_PATH.exists():
-        return LEGACY_IGNORE_PATH
-    return LOREIGNORE_PATH
+    return prefer(LOREIGNORE_PATH, LEGACY_IGNORE_PATH)
 
 
 def migrate_legacy_db_if_needed() -> tuple[pathlib.Path, bool]:
-    """If the new lore.db doesn't exist but the legacy mine.db does, copy
-    on first launch. Old file is kept as backup; user removes when ready.
-    Returns (active_db_path, did_migrate)."""
-    if DEFAULT_DB_PATH.exists():
-        return DEFAULT_DB_PATH, False
-    LORE_DIR.mkdir(parents=True, exist_ok=True)
-    if not LEGACY_DB_PATH.exists():
-        return DEFAULT_DB_PATH, False
-    import shutil
-    shutil.copy2(str(LEGACY_DB_PATH), str(DEFAULT_DB_PATH))
-    for suffix in ("-shm", "-wal"):
-        legacy_companion = pathlib.Path(str(LEGACY_DB_PATH) + suffix)
-        new_companion = pathlib.Path(str(DEFAULT_DB_PATH) + suffix)
-        if legacy_companion.exists() and not new_companion.exists():
-            shutil.copy2(str(legacy_companion), str(new_companion))
-    print(
-        f"[lore] migrated legacy database: {LEGACY_DB_PATH} -> {DEFAULT_DB_PATH}",
-        file=sys.stderr,
+    """CLI entry's migration: copy legacy mine.db -> lore.db on first launch,
+    keeping the legacy file as a backup. Hooks use the move-style migration
+    via _common.migrate_legacy_files; the CLI prefers copy so a bad upgrade
+    can be rolled back by deleting lore.db."""
+    sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
+    from _common import migrate_legacy_files
+    target, source = migrate_legacy_files(
+        LORE_DIR, "lore.db",
+        [LEGACY_DB_PATH],
+        move=False, include_sqlite_companions=True,
     )
-    print(
-        "[lore] legacy file kept as backup; remove manually when satisfied.",
-        file=sys.stderr,
-    )
-    return DEFAULT_DB_PATH, True
+    if source is not None:
+        print(f"[lore] migrated legacy database: {source} -> {target}", file=sys.stderr)
+        print("[lore] legacy file kept as backup; remove manually when satisfied.", file=sys.stderr)
+        return target, True
+    return target, False
 
 
 # kept under the legacy name for backward source-import compatibility; new

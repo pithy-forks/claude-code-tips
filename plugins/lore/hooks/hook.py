@@ -24,35 +24,24 @@ from typing import Callable
 # Paths
 # ---------------------------------------------------------------------------
 
-CLAUDE_DIR = pathlib.Path.home() / ".claude"
-LORE_DIR = CLAUDE_DIR / "lore"
+HOOK_DIR = pathlib.Path(__file__).resolve().parent
+SCRIPTS_DIR = HOOK_DIR.parent / "scripts"
+sys.path.insert(0, str(SCRIPTS_DIR))
+
+from _common import (  # noqa: E402  -- intentional: scripts dir on path first
+    CLAUDE_DIR,
+    LORE_DIR,
+    log_stderr,
+    prefer,
+    safe_load_json,
+)
+import anthropic_canonical  # noqa: E402
+from mine import extract_tool_summary  # noqa: E402  -- single source of truth
+
 LEGACY_DB_PATH = CLAUDE_DIR / "mine.db"  # pre-v2.0
 LEGACY_CONFIG_PATH = CLAUDE_DIR / "mine.json"  # pre-v2.0
 DB_PATH = LORE_DIR / "lore.db"
 CONFIG_PATH = LORE_DIR / "config.json"
-HOOK_DIR = pathlib.Path(__file__).resolve().parent
-SCRIPTS_DIR = HOOK_DIR.parent / "scripts"
-
-
-def _resolve_db_path() -> pathlib.Path:
-    """Lore v2.0 stores db at ~/.claude/lore/lore.db. v1.x stored it at
-    ~/.claude/mine.db. If only the legacy path exists, return that so the
-    plugin keeps working before its first ingest writes the new file.
-    Migration to the new location happens on the next mine.py invocation."""
-    if DB_PATH.exists():
-        return DB_PATH
-    if LEGACY_DB_PATH.exists():
-        return LEGACY_DB_PATH
-    return DB_PATH
-
-
-def _resolve_config_path() -> pathlib.Path:
-    """Same dual-path logic as the db: prefer the new location, fall back."""
-    if CONFIG_PATH.exists():
-        return CONFIG_PATH
-    if LEGACY_CONFIG_PATH.exists():
-        return LEGACY_CONFIG_PATH
-    return CONFIG_PATH
 
 
 # ---------------------------------------------------------------------------
@@ -61,11 +50,7 @@ def _resolve_config_path() -> pathlib.Path:
 
 def load_config() -> dict:
     """Load lore config (lore/config.json or legacy mine.json). Empty dict if missing."""
-    path = _resolve_config_path()
-    try:
-        return json.loads(path.read_text()) if path.exists() else {}
-    except (json.JSONDecodeError, OSError):
-        return {}
+    return safe_load_json(prefer(CONFIG_PATH, LEGACY_CONFIG_PATH)) or {}
 
 
 def is_enabled(config: dict, feature: str) -> bool:
@@ -75,7 +60,7 @@ def is_enabled(config: dict, feature: str) -> bool:
 
 def db_connect(apply_schema: bool = False) -> sqlite3.Connection | None:
     """Connect to lore.db (or legacy mine.db) with WAL + 5s timeout. None if missing."""
-    path = _resolve_db_path()
+    path = prefer(DB_PATH, LEGACY_DB_PATH)
     if not path.exists():
         return None
     conn = sqlite3.connect(str(path), timeout=5)
@@ -86,36 +71,32 @@ def db_connect(apply_schema: bool = False) -> sqlite3.Connection | None:
             try:
                 conn.executescript(schema_file.read_text())
             except sqlite3.Error as e:
-                log(f"[mine] schema apply warning: {e}")
+                log(f"[lore] schema apply warning: {e}")
+        # Bootstrap the anthropic_* tables on the same connection so a
+        # SessionStart hook only needs one apply_schema round-trip.
+        try:
+            anthropic_canonical.apply_schema(conn)
+        except sqlite3.Error as e:
+            log(f"[lore] anthropic schema apply warning: {e}")
     return conn
 
 
 def find_mine_py() -> pathlib.Path | None:
-    """Locate mine.py: plugin-local first, then installed plugin paths."""
+    """Locate mine.py: plugin-local first, then installed plugin paths.
+
+    Looks for both the new (lore/) and legacy (mine/) install directory
+    names so existing v1.x installs continue to work during the rename
+    rollout."""
     local = SCRIPTS_DIR / "mine.py"
     if local.exists():
         return local
     plugins_dir = CLAUDE_DIR / "plugins"
-    if plugins_dir.exists():
-        for p in plugins_dir.rglob("mine/scripts/mine.py"):
+    if not plugins_dir.exists():
+        return None
+    for plugin_name in ("lore", "mine"):
+        for p in plugins_dir.rglob(f"{plugin_name}/scripts/mine.py"):
             return p
     return None
-
-
-def extract_tool_summary(tool_name: str, tool_input: dict) -> str:
-    """Extract a human-readable summary from tool input."""
-    if not isinstance(tool_input, dict):
-        return str(tool_input)[:300]
-    if tool_name in ("Read", "Write", "Edit"):
-        return tool_input.get("file_path", "")
-    if tool_name == "Bash":
-        return (tool_input.get("command") or tool_input.get("description") or "")[:200]
-    if tool_name in ("Grep", "Glob"):
-        return tool_input.get("pattern", "")
-    if tool_name == "Task":
-        return (tool_input.get("description") or tool_input.get("prompt") or "")[:200]
-    vals = list(tool_input.values())
-    return str(vals[0])[:200] if vals else ""
 
 
 def log(msg: str) -> None:
@@ -345,39 +326,28 @@ def handle_startup(payload: dict, config: dict) -> None:
     project_name is derived from basename(cwd) — this matches how mine.py derives it
     from the JSONL metadata field, which is also the directory basename.
     """
-    # one-time migrations to the v2.0 ~/.claude/lore/ subdirectory layout.
-    # historical names (miner -> mine -> lore) all funnel into lore.db.
-    LORE_DIR.mkdir(parents=True, exist_ok=True)
-    if not DB_PATH.exists():
-        # try miner.db first (oldest), then mine.db (v1.x), in priority order.
-        for legacy_name in ("miner.db", "mine.db"):
-            candidate = CLAUDE_DIR / legacy_name
-            if candidate.exists():
-                candidate.rename(DB_PATH)
-                # companions
-                for suffix in ("-shm", "-wal"):
-                    legacy_companion = pathlib.Path(str(candidate) + suffix)
-                    new_companion = pathlib.Path(str(DB_PATH) + suffix)
-                    if legacy_companion.exists():
-                        legacy_companion.rename(new_companion)
-                context(f"[lore] migrated {legacy_name} -> ~/.claude/lore/lore.db")
-                break
-    # config + ignore file follow the same pattern
-    if not CONFIG_PATH.exists():
-        for legacy_name in ("miner.json", "mine.json"):
-            candidate = CLAUDE_DIR / legacy_name
-            if candidate.exists():
-                candidate.rename(CONFIG_PATH)
-                break
-    legacy_ignore = LORE_DIR / ".loreignore"
-    if not legacy_ignore.exists():
-        for legacy_name in (".minerignore", ".mineignore"):
-            candidate = CLAUDE_DIR / legacy_name
-            if candidate.exists():
-                candidate.rename(legacy_ignore)
-                break
+    # historical name funnel: miner -> mine -> lore. all converge here.
+    # the hook handles the rename-style move; mine.py's migrate_legacy_db_if_needed
+    # handles the copy-style fallback for users who run the CLI before this hook.
+    from _common import migrate_legacy_files
+    migrate_legacy_files(
+        LORE_DIR, "lore.db",
+        [CLAUDE_DIR / "miner.db", LEGACY_DB_PATH],
+        move=True, include_sqlite_companions=True,
+    )
+    migrate_legacy_files(
+        LORE_DIR, "config.json",
+        [CLAUDE_DIR / "miner.json", LEGACY_CONFIG_PATH],
+        move=True,
+    )
+    migrate_legacy_files(
+        LORE_DIR, ".loreignore",
+        [CLAUDE_DIR / ".minerignore", CLAUDE_DIR / ".mineignore"],
+        move=True,
+    )
 
-    # apply_schema=True ensures views exist (user_session_costs, user_tool_calls, etc.)
+    # db_connect(apply_schema=True) bootstraps both lore's schema.sql AND the
+    # anthropic_* tables on the same connection in one round-trip.
     conn = db_connect(apply_schema=True)
     if not conn:
         return
@@ -386,22 +356,13 @@ def handle_startup(payload: dict, config: dict) -> None:
     if count == 0:
         log("[lore] first session — tracking starts now")
 
-    # Refresh anthropic-canonical tables (stats-cache.json + sessions-index.json)
-    # so the lore dashboard's totals stay aligned with /usage even when CC's
-    # 30-day JSONL retention sweep deletes old transcripts.
+    # Refresh anthropic-canonical tables on every SessionStart so /lore's
+    # totals stay aligned with /usage even when CC's retention sweep deletes
+    # old transcripts. Skipped silently on parse errors; lore.db remains usable.
     try:
-        sys.path.insert(0, str(SCRIPTS_DIR))
-        import anthropic_canonical  # type: ignore
-        anthropic_canonical.apply_schema(conn)
-        anthropic_canonical.ingest_stats_cache(conn)
-        anthropic_canonical.ingest_session_indexes(conn)
+        anthropic_canonical.refresh(conn)
     except Exception as e:
         log(f"[lore] anthropic_canonical refresh skipped: {e}")
-    finally:
-        try:
-            sys.path.remove(str(SCRIPTS_DIR))
-        except ValueError:
-            pass
 
     cwd = payload.get("cwd") or os.getcwd()
     project_name = os.path.basename(cwd)

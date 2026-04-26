@@ -248,12 +248,20 @@ class TestExtractToolSummary:
     def test_grep(self):
         assert hook.extract_tool_summary("Grep", {"pattern": "TODO"}) == "TODO"
 
-    def test_bash_truncation(self):
+    def test_bash_no_truncation(self):
+        # extract_tool_summary now lives in mine.py (single source of truth).
+        # mine.py preserves the full Bash command verbatim and only truncates
+        # the JSON fallback. hook.py's previous private copy truncated at 200;
+        # the database has always stored full Bash commands either way, so
+        # consolidation doesn't change persisted data, only hook-event passing.
         s = hook.extract_tool_summary("Bash", {"command": "x" * 500})
-        assert len(s) == 200
+        assert s == "x" * 500
 
     def test_empty_input(self):
-        assert hook.extract_tool_summary("Unknown", {}) == ""
+        # mine.py's fallback returns str(tool_input)[:300] for empty/unknown
+        # cases; that's '{}' rather than '' so the caller can distinguish
+        # "tool invoked with empty args" from "no tool record".
+        assert hook.extract_tool_summary("Unknown", {}) == "{}"
 
 
 # ===========================================================================

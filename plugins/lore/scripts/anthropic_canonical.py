@@ -29,9 +29,9 @@ import json
 import pathlib
 import sqlite3
 import sys
-from datetime import datetime, timezone
 
-CLAUDE_DIR = pathlib.Path.home() / ".claude"
+from _common import CLAUDE_DIR, now_iso, safe_load_json, log_stderr
+
 PROJECTS_DIR = CLAUDE_DIR / "projects"
 STATS_CACHE_PATH = CLAUDE_DIR / "stats-cache.json"
 
@@ -107,20 +107,12 @@ def apply_schema(conn: sqlite3.Connection) -> None:
     conn.executescript(SCHEMA_SQL)
 
 
-def now_iso() -> str:
-    return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
-
-
 def ingest_stats_cache(conn: sqlite3.Connection) -> dict:
     """Parse ~/.claude/stats-cache.json and upsert into anthropic_stats +
     anthropic_daily_activity + anthropic_model_usage + anthropic_hour_counts.
     Returns the totals dict for callers that want to print or log."""
-    if not STATS_CACHE_PATH.exists():
-        return {}
-    try:
-        data = json.loads(STATS_CACHE_PATH.read_text())
-    except (json.JSONDecodeError, OSError) as e:
-        print(f"[lore] failed to parse stats-cache.json: {e}", file=sys.stderr)
+    data = safe_load_json(STATS_CACHE_PATH)
+    if data is None:
         return {}
 
     last_computed = data.get("lastComputedDate", "")
@@ -249,9 +241,8 @@ def ingest_session_indexes(conn: sqlite3.Connection) -> dict:
     ingested_at = now_iso()
 
     for index_path in PROJECTS_DIR.glob("*/sessions-index.json"):
-        try:
-            data = json.loads(index_path.read_text())
-        except (json.JSONDecodeError, OSError):
+        data = safe_load_json(index_path)
+        if data is None:
             continue
         files_read += 1
         for entry in data.get("entries") or []:
@@ -324,23 +315,31 @@ def verify_alignment(conn: sqlite3.Connection) -> dict:
     }
 
 
-def refresh(db_path: pathlib.Path) -> dict:
-    """End-to-end: open db, apply schema, ingest both sources, verify.
+def refresh(conn_or_path) -> dict:
+    """End-to-end: apply schema, ingest both sources, verify.
+
+    Accepts either an open sqlite3.Connection (preferred — used by hooks
+    that already have one open) or a filesystem path (used by the CLI).
+    When given a path, opens + closes the connection itself.
+
     Idempotent. Safe to call from a SessionStart hook on every launch."""
-    conn = sqlite3.connect(str(db_path), timeout=5)
-    try:
+    if isinstance(conn_or_path, sqlite3.Connection):
+        conn = conn_or_path
+        owns_conn = False
+    else:
+        conn = sqlite3.connect(str(conn_or_path), timeout=5)
         conn.execute("PRAGMA journal_mode=WAL")
+        owns_conn = True
+    try:
         apply_schema(conn)
-        stats = ingest_stats_cache(conn)
-        idx = ingest_session_indexes(conn)
-        alignment = verify_alignment(conn)
         return {
-            "stats": stats,
-            "session_index": idx,
-            "alignment": alignment,
+            "stats": ingest_stats_cache(conn),
+            "session_index": ingest_session_indexes(conn),
+            "alignment": verify_alignment(conn),
         }
     finally:
-        conn.close()
+        if owns_conn:
+            conn.close()
 
 
 def main() -> int:
