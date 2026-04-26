@@ -9,11 +9,6 @@
             "tool": "cc",
             "input": { "action": "check" },
             "timeout": 5
-          },
-          {
-            "type": "command",
-            "command": "bash ${CLAUDE_PLUGIN_ROOT}/hooks/time-project-hint.sh",
-            "timeout": 5
           }
         ]
       }

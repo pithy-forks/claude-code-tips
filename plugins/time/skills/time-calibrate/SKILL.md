@@ -1,6 +1,6 @@
 ---
 name: time-calibrate
-description: measure your real CC throughput against the time rule's matrix, using mine.db
+description: measure your real CC throughput against the time rule's matrix, using lore.db
 user-invocable: false
 ---
 <!-- tested with: claude code v2.1.118 -->
@@ -11,22 +11,22 @@ re-measure your personal throughput and produce a diff report against the generi
 
 ## what to do when invoked
 
-1. **check for `~/.claude/mine.db`** via `Bash`:
+1. **check for `~/.claude/lore.db`** via `Bash`:
    ```bash
-   test -r "$HOME/.claude/mine.db" && echo present || echo absent
+   test -r "$HOME/.claude/lore.db" && echo present || echo absent
    ```
 
 2. **if absent**, explain and stop:
-   - the calibration needs session history in `~/.claude/mine.db`.
-   - that database is built by the `mine` plugin from `~/.claude/projects/`.
-   - install via `/plugin install mine@cc`, run `/mine backfill`, then re-run `/time-calibrate`.
+   - the calibration needs session history in `~/.claude/lore.db`.
+   - that database is built by the `lore` plugin from `~/.claude/projects/`.
+   - install via `/plugin install lore@cc`, run `/lore:graph`, then re-run `/time-calibrate`.
    - do not fail loudly. one-screen message, no stack traces.
 
 3. **if present**, resolve active effort (same precedence as `/time-estimate`) and current model, then run the calibration SQL via `Bash` + `sqlite3 -readonly`.
 
 ## calibration SQL
 
-paste into `sqlite3 -readonly ~/.claude/mine.db <<SQL ... SQL` or use a heredoc. all queries are parameter-free and read-only.
+paste into `sqlite3 -readonly ~/.claude/lore.db <<SQL ... SQL` or use a heredoc. all queries are parameter-free and read-only.
 
 ```sql
 -- A. session-length bucket distribution
@@ -107,6 +107,6 @@ flag any cell that drifts >15% from the rule. sample sizes under 50 are low-conf
 
 ## rules
 
-- never modify `mine.db`. read-only only.
+- never modify `lore.db`. read-only only.
 - never write a personal override file to the plugin directory. the plugin is shared.
 - if the user wants to persist drift findings, suggest a personal note in `~/.claude/rules/` (user scope).

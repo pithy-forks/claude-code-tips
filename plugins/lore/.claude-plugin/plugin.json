@@ -1,0 +1,11 @@
+{
+  "name": "lore",
+  "version": "2.0.0",
+  "description": "Your accumulated Claude Code lore as a deterministic knowledge graph. Every session, file, project, tool, and resume relationship becomes a node or edge that builds itself from your transcripts. Query past sessions, surface recurring patterns, export for sharing.",
+  "author": {
+    "name": "Ani Potts",
+    "url": "https://github.com/anipotts"
+  },
+  "repository": "https://github.com/anipotts/claude-code-tips",
+  "license": "MIT"
+}

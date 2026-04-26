@@ -4,7 +4,7 @@
 
 When planning, estimating, or communicating timelines in Claude Code sessions, frame in CC active time (what Claude actually does), not wall time (what you see, dominated by human-review idle). All implementation is done by Claude Code.
 
-**Last calibrated:** 2026-04-22 against April 2026 official docs + empirical session data. Quarterly re-calibration recommended. Use `/time-calibrate` to re-measure against your own `mine.db`.
+**Last calibrated:** 2026-04-22 against April 2026 official docs + empirical session data. Quarterly re-calibration recommended. Use `/time-calibrate` to re-measure against your own `lore.db`.
 
 ### The only two numbers
 
@@ -33,7 +33,7 @@ Claude does not slow down in long sessions. The human reviewer does. Wall-time t
 
 ### Model × effort throughput matrix
 
-Relative to the Opus 4.6 `low` baseline (1.0× = ~3.0 calls/active min). Bold values are measured empirically. Non-bold are directional estimates extrapolated from adaptive-thinking proxies. Anthropic does not publish official per-effort throughput; re-measure your own with `/time-calibrate` (requires the `mine` plugin installed).
+Relative to the Opus 4.6 `low` baseline (1.0× = ~3.0 calls/active min). Bold values are measured empirically. Non-bold are directional estimates extrapolated from adaptive-thinking proxies. Anthropic does not publish official per-effort throughput; re-measure your own with `/time-calibrate` (requires the `lore` plugin installed).
 
 | Model | low | medium | high | xhigh | max | Context |
 |---|---|---|---|---|---|---|
@@ -154,7 +154,7 @@ Example: "**`CC: 2-3 sessions`** (medium confidence; depends on API compatibilit
 
 The matrix above is a generic starting point. Your actual throughput depends on your effort setting, the tasks you do, and your model mix. To re-measure:
 
-1. Run `/time-calibrate` (needs the `mine` plugin installed, which builds `~/.claude/mine.db` from session logs).
+1. Run `/time-calibrate` (needs the `lore` plugin installed, which builds `~/.claude/lore.db` from session logs).
 2. Review the diff report against the matrix above.
 3. If any cell drifts >15% from the matrix, trust your own measurement and keep a personal note next to this rule.
 4. Quarterly re-calibration is a good default cadence.

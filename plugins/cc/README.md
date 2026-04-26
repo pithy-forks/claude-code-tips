@@ -132,14 +132,8 @@ plugins/cc/
 ├── lib/
 │   ├── render.ts                   Digest → additionalContext text
 │   └── transcript-tail.ts          watches own transcript, publishes recent_files
-├── hooks/
-│   ├── hooks.json                  3 mcp_tool hooks (SessionStart, UserPromptSubmit, SessionEnd)
-│   └── time-project-hint.sh        SessionStart project-timing hint (time subsystem)
-├── commands/sessions.md            /cc:sessions slash command
-├── rules/time.md                   time budgeting rule
-├── skills/time-estimate/           model-callable only (user-invocable: false)
-├── skills/time-calibrate/          model-callable only (user-invocable: false)
-└── skills/time-benchmark/          model-callable only (user-invocable: false)
+├── hooks/hooks.json                3 mcp_tool hooks (SessionStart, UserPromptSubmit, SessionEnd)
+└── commands/sessions.md            /cc:sessions slash command
 ```
 
 state at `${CLAUDE_CONFIG_DIR:-~/.claude}/cc/`:
@@ -173,19 +167,15 @@ sessions converge safely.
 - **sqlite database corrupted:** remove `${CLAUDE_CONFIG_DIR:-~/.claude}/cc/sessions.db*`
   and restart any session; schema is recreated.
 
-## time subsystem
+## upgrading from cc 2.x
 
-cc also hosts the `time` subsystem introduced in v1.1.0 (unchanged):
+if you used `/cc:time-estimate`, `/cc:time-calibrate`, `/cc:time-benchmark`, or the SessionStart project-timing hint, those moved out of cc into a focused `time` plugin in this same marketplace. install it with:
 
-- `rules/time.md`: cc-time budgeting rule (bimodal modes, model × effort matrix, 3 tiers of parallelism)
-- `hooks/time-project-hint.sh`: `SessionStart` project-scoped timing hint, reads `~/.claude/mine.db` if present
-- `/cc:time-estimate <task>`: produces a ranged estimate with effort-rung cited
-- `/cc:time-calibrate`: diffs your real throughput (needs `mine` plugin)
-- `/cc:time-benchmark`: A/B/C across `/effort low`/`medium`/`high` on your current model
+```
+/plugin install time@cc
+```
 
-skills are namespaced under `cc:`. claude code will accept the bare form (`/time-estimate`) when no other plugin registers the same name; the namespaced form is the canonical one.
-
-see `rules/time.md` for the full matrix and estimation format.
+cc 3.0 is **session mesh, period.** email-cc semantics for agents.
 
 ## rollback
 

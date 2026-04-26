@@ -4,30 +4,30 @@
     "name": "Ani Potts"
   },
   "metadata": {
-    "description": "claude code plugins by ani potts: session awareness, usage mining, and tools.",
-    "version": "2.3.2"
+    "description": "claude code plugins by ani potts: session mesh, knowledge graph over your history, and time awareness.",
+    "version": "3.0.0"
   },
   "plugins": [
     {
       "name": "cc",
       "source": "./plugins/cc",
-      "description": "session mesh for claude code (email-cc semantics): awareness digests, file-overlap alerts, topic subscriptions, cross-session messaging",
+      "description": "session mesh for claude code (email-cc semantics): awareness digests, file-overlap alerts, topic subscriptions, cross-session messaging.",
       "author": { "name": "Ani Potts" },
       "license": "MIT",
       "category": "collaboration"
     },
     {
-      "name": "mine",
-      "source": "./plugins/mine",
-      "description": "mines every claude code session into sqlite. costs, search, patterns, error memory.",
+      "name": "lore",
+      "source": "./plugins/lore",
+      "description": "your accumulated claude code lore as a deterministic knowledge graph. every session, file, project, tool, and resume edge becomes a node. /lore:graph, /lore:remember, /lore:export.",
       "author": { "name": "Ani Potts" },
       "license": "MIT",
       "category": "analytics"
     },
     {
-      "name": "fuel",
-      "source": "./plugins/fuel",
-      "description": "gives claude code a fuel gauge for its 5-hour, 7-day, and 200k-context meters. pre-turn hook injects threshold-aware context. /fuel state | handoff | quiet | loud.",
+      "name": "time",
+      "source": "./plugins/time",
+      "description": "claude's awareness of how alive it is. 5h + 7d + context-window meters with a budgeting rule. /time:left, /time:estimate, /time:handoff.",
       "author": { "name": "Ani Potts" },
       "license": "MIT",
       "category": "awareness"

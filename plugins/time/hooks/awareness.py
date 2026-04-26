@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # tested with: claude code v2.1.118
-"""awareness.py: UserPromptSubmit hook for claude-fuel.
+"""awareness.py: UserPromptSubmit hook for the time plugin.
 
 Reads ~/.claude/.fuel_cache (written by the statusline) and injects
 threshold-tier awareness text into Claude's context via stdout.
@@ -9,8 +9,10 @@ Tiers (driven by max of 5hr/7day/context):
   <60%    silent (exit 0, no output)
   60-80%  one compact meter line
   80-90%  meter line + proactive nudge
-  90-95%  meter line + personalized baseline from mine.db
+  90-95%  meter line + handoff suggestion
   95%+    dramatic alert + handoff suggestion
+
+No cross-plugin reads. Pure stdlib.
 
 stdout = Claude's additionalContext (documented behavior for UserPromptSubmit)
 stderr = debug only, suppressed by default
@@ -21,14 +23,12 @@ from __future__ import annotations
 import json
 import os
 import pathlib
-import sqlite3
 import sys
 import time
 from datetime import datetime
 
 CLAUDE_DIR = pathlib.Path.home() / ".claude"
 CACHE_PATH = CLAUDE_DIR / ".fuel_cache"
-MINE_DB = CLAUDE_DIR / "mine.db"
 QUIET_FLAG = CLAUDE_DIR / ".fuel_quiet"
 STALE_SECONDS = 15 * 60
 DRAMATIC = os.environ.get("FUEL_DRAMATIC", "").lower() in ("1", "true", "yes")
@@ -77,35 +77,11 @@ def fmt_reset(unix_ts) -> str:
 
 
 def median_session_minutes(model: str | None) -> int | None:
-    """Query mine.db for median active session duration for this model."""
-    if not MINE_DB.exists():
-        return None
-    try:
-        conn = sqlite3.connect(str(MINE_DB), timeout=2)
-        conn.execute("PRAGMA journal_mode=WAL")
-        cur = conn.cursor()
-        # crude median: order by duration, pick middle row
-        pattern = f"{model}%" if model else "%"
-        cur.execute(
-            """
-            SELECT duration_active_seconds FROM sessions
-            WHERE is_subagent = 0
-              AND duration_active_seconds IS NOT NULL
-              AND duration_active_seconds > 60
-              AND model LIKE ?
-            ORDER BY duration_active_seconds
-            """,
-            (pattern,),
-        )
-        rows = [r[0] for r in cur.fetchall()]
-        conn.close()
-        if not rows:
-            return None
-        mid = rows[len(rows) // 2]
-        return max(1, mid // 60)
-    except sqlite3.Error as e:
-        log(f"mine.db query failed: {e}")
-        return None
+    """Static fallback. The previous version queried a sibling plugin's database
+    for personalized medians; that introduced cross-plugin coupling. The time
+    plugin now uses generic baselines and stays standalone. A future opt-in
+    bridge plugin could reintroduce personalization."""
+    return None
 
 
 def tier_for(max_pct: float) -> str:
