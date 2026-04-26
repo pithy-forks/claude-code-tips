@@ -28,7 +28,10 @@ import time
 from datetime import datetime
 
 CLAUDE_DIR = pathlib.Path.home() / ".claude"
-CACHE_PATH = CLAUDE_DIR / ".fuel_cache"
+# accept either name. statuslines that predate the pulse->fuel rename
+# (commit 1588cfa) still write to .pulse_cache; new statuslines may write
+# to .fuel_cache. read whichever exists, preferring the newer one.
+CACHE_PATHS = (CLAUDE_DIR / ".fuel_cache", CLAUDE_DIR / ".pulse_cache")
 QUIET_FLAG = CLAUDE_DIR / ".fuel_quiet"
 STALE_SECONDS = 15 * 60
 DRAMATIC = os.environ.get("FUEL_DRAMATIC", "").lower() in ("1", "true", "yes")
@@ -40,14 +43,22 @@ def log(msg: str) -> None:
 
 
 def read_cache() -> dict | None:
-    if not CACHE_PATH.exists():
+    """Read the freshest available statusline cache. Returns None if
+    neither file exists or both are unparseable."""
+    candidates = [p for p in CACHE_PATHS if p.exists()]
+    if not candidates:
         return None
-    try:
-        data = json.loads(CACHE_PATH.read_text())
-        return data if isinstance(data, dict) else None
-    except (json.JSONDecodeError, OSError) as e:
-        log(f"cache read failed: {e}")
-        return None
+    # if both exist, prefer whichever was written more recently
+    candidates.sort(key=lambda p: p.stat().st_mtime, reverse=True)
+    for path in candidates:
+        try:
+            data = json.loads(path.read_text())
+            if isinstance(data, dict):
+                return data
+        except (json.JSONDecodeError, OSError) as e:
+            log(f"cache read failed at {path}: {e}")
+            continue
+    return None
 
 
 def read_hook_input() -> dict:
