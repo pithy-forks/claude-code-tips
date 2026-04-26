@@ -384,7 +384,24 @@ def handle_startup(payload: dict, config: dict) -> None:
 
     count = conn.execute("SELECT COUNT(*) FROM sessions").fetchone()[0]
     if count == 0:
-        log("[mine] first session — tracking starts now")
+        log("[lore] first session — tracking starts now")
+
+    # Refresh anthropic-canonical tables (stats-cache.json + sessions-index.json)
+    # so the lore dashboard's totals stay aligned with /usage even when CC's
+    # 30-day JSONL retention sweep deletes old transcripts.
+    try:
+        sys.path.insert(0, str(SCRIPTS_DIR))
+        import anthropic_canonical  # type: ignore
+        anthropic_canonical.apply_schema(conn)
+        anthropic_canonical.ingest_stats_cache(conn)
+        anthropic_canonical.ingest_session_indexes(conn)
+    except Exception as e:
+        log(f"[lore] anthropic_canonical refresh skipped: {e}")
+    finally:
+        try:
+            sys.path.remove(str(SCRIPTS_DIR))
+        except ValueError:
+            pass
 
     cwd = payload.get("cwd") or os.getcwd()
     project_name = os.path.basename(cwd)

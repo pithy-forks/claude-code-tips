@@ -78,9 +78,25 @@ Three core intents, plus search and freeform. If no argument is given, show the 
 
 The answer to "what's happening?" Recent activity, where compute goes, whether sessions are productive.
 
+**Lore is a dual-source store.** Canonical lifetime totals come from Anthropic's pre-computed `~/.claude/stats-cache.json` (mirrored into the `anthropic_stats` table) and exactly match what `/usage` shows. Per-session detail (messages, tool calls, transcripts) comes from JSONL ingestion and only covers sessions whose JSONLs still exist on disk (CC's 30-day retention). When the user asks for lifetime totals, query `anthropic_stats`; when they ask for session detail or recent activity, query the `sessions`/`messages` tables.
+
 `````bash
 sqlite3 -header -separator '|' "$DB" <<'SQL'
--- summary (7d)
+-- canonical lifetime totals (matches /usage)
+SELECT 'LIFETIME' s, total_sessions, total_messages, total_tool_calls,
+  active_days_count, peak_hour, favorite_model, last_computed_date
+FROM anthropic_stats
+ORDER BY last_computed_date DESC LIMIT 1;
+
+-- coverage: how much of lifetime do JSONL transcripts still cover?
+SELECT 'COVERAGE' s,
+  (SELECT COUNT(*) FROM sessions WHERE is_subagent = 0) lore_main_sessions,
+  (SELECT COUNT(*) FROM messages) lore_messages,
+  (SELECT total_sessions FROM anthropic_stats ORDER BY last_computed_date DESC LIMIT 1) anth_sessions,
+  ROUND(100.0 * (SELECT COUNT(*) FROM sessions WHERE is_subagent = 0) /
+        NULLIF((SELECT total_sessions FROM anthropic_stats ORDER BY last_computed_date DESC LIMIT 1), 0), 1) coverage_pct;
+
+-- summary (7d, transcript-based for detail)
 SELECT 'SUMMARY' s, COUNT(*) sessions,
   ROUND(SUM(duration_active_seconds) / 3600.0, 1) active_hrs,
   ROUND(SUM(estimated_cost_usd), 2) api_value,
@@ -112,11 +128,13 @@ SQL
 `````
 
 Format:
-1. **Freshness line**: `data: <first_date> → <latest_date> · scope: <project|global>`
-2. **7-day summary**: sessions | active hours | commits | API value | cache hit %
-3. **Top projects**: project | sessions | API value
-4. **Health line**: "X of Y sessions shipped commits. Z needed compaction."
-5. **Insight**: one specific observation from the data (compare to prior week, flag outliers, surface patterns)
+1. **Lifetime line**: `lifetime: <total_sessions> sessions · <total_messages> messages · <active_days> active days · favorite: <model>` (from `anthropic_stats`)
+2. **Coverage line**: `transcripts: <lore_main_sessions> of <anth_sessions> sessions (<coverage_pct>%) — older sessions deleted by CC retention sweep`
+3. **Freshness line**: `recent data: <first_date> → <latest_date> · scope: <project|global>`
+4. **7-day summary**: sessions | active hours | commits | API value | cache hit %
+5. **Top projects**: project | sessions | API value
+6. **Health line**: "X of Y sessions shipped commits. Z needed compaction."
+7. **Insight**: one specific observation from the data (compare to prior week, flag outliers, surface patterns)
 
 ---
 
