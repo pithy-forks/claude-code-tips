@@ -3,13 +3,13 @@
   "private": true,
   "type": "module",
   "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.12.1",
-    "better-sqlite3": "^11.3.0"
+    "@modelcontextprotocol/sdk": "^1.12.1"
   },
   "devDependencies": {
-    "tsx": "^4.0.0",
     "typescript": "^5.0.0",
-    "@types/node": "^22.0.0",
-    "@types/better-sqlite3": "^7.6.11"
+    "@types/bun": "^1.1.0"
+  },
+  "engines": {
+    "bun": ">=1.1.0"
   }
 }
