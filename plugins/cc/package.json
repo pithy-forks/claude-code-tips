@@ -2,6 +2,15 @@
   "name": "cc",
   "private": true,
   "type": "module",
+  "scripts": {
+    "build:bin": "bun build --compile --minify --sourcemap server.ts --outfile dist/cc-server",
+    "build:bin:darwin-arm64": "bun build --compile --minify --target=bun-darwin-arm64 server.ts --outfile dist/cc-server-darwin-arm64",
+    "build:bin:darwin-x64": "bun build --compile --minify --target=bun-darwin-x64 server.ts --outfile dist/cc-server-darwin-x64",
+    "build:bin:linux-arm64": "bun build --compile --minify --target=bun-linux-arm64 server.ts --outfile dist/cc-server-linux-arm64",
+    "build:bin:linux-x64": "bun build --compile --minify --target=bun-linux-x64 server.ts --outfile dist/cc-server-linux-x64",
+    "build:bin:all": "bun run build:bin:darwin-arm64 && bun run build:bin:darwin-x64 && bun run build:bin:linux-arm64 && bun run build:bin:linux-x64",
+    "smoke": "echo '{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"initialize\",\"params\":{\"protocolVersion\":\"2024-11-05\",\"capabilities\":{},\"clientInfo\":{\"name\":\"smoke\",\"version\":\"0\"}}}' | bun server.ts"
+  },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.12.1"
   },
