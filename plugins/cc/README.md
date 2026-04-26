@@ -17,7 +17,9 @@ the v1 plugin, unchanged.
 /plugin install cc@cc
 ```
 
-zero configuration. works on macos, linux, wsl. needs node 18+.
+zero configuration. works on macos, linux, wsl.
+
+**runtime:** [bun](https://bun.sh) 1.1+. install with `curl -fsSL https://bun.sh/install | bash` (~15s, one-time). bun replaces node + tsx + better-sqlite3 with a single binary; cold-start is ~13× faster and there is no native-module compile step.
 
 ## quickstart
 

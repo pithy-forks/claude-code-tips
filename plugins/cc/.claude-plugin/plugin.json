@@ -1,6 +1,6 @@
 {
   "name": "cc",
-  "version": "2.1.0",
+  "version": "2.2.0",
   "description": "Session mesh for Claude Code. Email-cc semantics: every session stays informed of what its siblings are doing, with file-overlap alerts that prevent two agents silently clobbering the same file. Includes the time subsystem (rule, hook, /time-* skills).",
   "author": { "name": "Ani Potts", "url": "https://github.com/anipotts" },
   "repository": "https://github.com/anipotts/claude-code-tips",
@@ -8,7 +8,7 @@
   "mcpServers": {
     "cc": {
       "command": "bash",
-      "args": ["-c", "ln -sfn \"${CLAUDE_PLUGIN_DATA}/node_modules\" \"${CLAUDE_PLUGIN_ROOT}/node_modules\" 2>/dev/null; exec npx tsx \"${CLAUDE_PLUGIN_ROOT}/server.ts\""]
+      "args": ["-c", "if [ ! -d \"${CLAUDE_PLUGIN_ROOT}/node_modules\" ]; then ln -sfn \"${CLAUDE_PLUGIN_DATA}/node_modules\" \"${CLAUDE_PLUGIN_ROOT}/node_modules\" 2>/dev/null || (cd \"${CLAUDE_PLUGIN_ROOT}\" && bun install --silent); fi; exec bun \"${CLAUDE_PLUGIN_ROOT}/server.ts\""]
     }
   },
   "channels": [{ "server": "cc" }]

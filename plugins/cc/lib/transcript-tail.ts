@@ -2,7 +2,7 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
 import * as os from "node:os";
-import type Database from "better-sqlite3";
+import type { Database } from "bun:sqlite";
 
 // Watches this session's own transcript file for tool_use entries,
 // extracts touched file paths, publishes them to sessions.db.recent_files.
@@ -58,7 +58,7 @@ function extractPaths(toolInput: unknown, out: Set<string>): void {
 }
 
 export function startTranscriptTail(opts: {
-  db: Database.Database;
+  db: Database;
   sessionId: string;
   cwd: string;
   maxPaths?: number;
