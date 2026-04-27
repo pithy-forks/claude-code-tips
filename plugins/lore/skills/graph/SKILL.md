@@ -30,22 +30,30 @@ If the database doesn't exist, tell the user to run `/lore` once (which auto-bac
 
 ## queries
 
+All queries use parameterized SQL via a small Python heredoc. This matches the convention used in `notes.py` and `/lore:export` -- no shell-string interpolation into SQL, so paths/projects with apostrophes or special characters work correctly.
+
 ### cooccurrence
 
 Resolve the user's "file" argument loosely -- they'll often give a short name (`hook.py`) when the DB has absolute paths. Use a LIKE match.
 
 `````bash
 TARGET="$1"  # e.g. "hook.py" or "/abs/path/to/file"
-sqlite3 -header -column "$DB" <<SQL
-SELECT
-  CASE WHEN file_a LIKE '%' || '$TARGET' || '%' THEN file_b ELSE file_a END AS neighbor,
-  session_count,
-  last_seen
-FROM file_cooccurrences
-WHERE file_a LIKE '%' || '$TARGET' || '%' OR file_b LIKE '%' || '$TARGET' || '%'
-ORDER BY session_count DESC
-LIMIT 20;
-SQL
+python3 - "$DB" "$TARGET" <<'PY'
+import sqlite3, sys
+db = sqlite3.connect(sys.argv[1])
+needle = f"%{sys.argv[2]}%"
+rows = db.execute("""
+  SELECT CASE WHEN file_a LIKE ? THEN file_b ELSE file_a END AS neighbor,
+         session_count, last_seen
+  FROM file_cooccurrences
+  WHERE file_a LIKE ? OR file_b LIKE ?
+  ORDER BY session_count DESC LIMIT 20
+""", (needle, needle, needle)).fetchall()
+if not rows:
+    print(f"no neighbors for '{sys.argv[2]}'")
+else:
+    for r in rows: print(f"  {r[1]:>4}  {r[0]}  ({r[2]})")
+PY
 `````
 
 If the LIKE returns nothing, try a wider match (basename only) before saying "no neighbors".
@@ -54,18 +62,23 @@ If the LIKE returns nothing, try a wider match (basename only) before saying "no
 
 `````bash
 PROJECT="$1"
-sqlite3 -header -column "$DB" <<SQL
-SELECT tc.input_summary AS file, COUNT(DISTINCT tc.session_id) AS sessions,
-       MAX(tc.timestamp) AS last_touched
-FROM tool_calls tc
-JOIN sessions s ON tc.session_id = s.id
-WHERE s.project_name = '$PROJECT'
-  AND tc.tool_name IN ('Edit','Read','Write','MultiEdit')
-  AND tc.input_summary IS NOT NULL
-GROUP BY tc.input_summary
-ORDER BY sessions DESC
-LIMIT 25;
-SQL
+python3 - "$DB" "$PROJECT" <<'PY'
+import sqlite3, sys
+db = sqlite3.connect(sys.argv[1])
+rows = db.execute("""
+  SELECT tc.input_summary AS file, COUNT(DISTINCT tc.session_id) AS sessions,
+         MAX(tc.timestamp) AS last_touched
+  FROM tool_calls tc JOIN sessions s ON tc.session_id = s.id
+  WHERE s.project_name = ?
+    AND tc.tool_name IN ('Edit','Read','Write','MultiEdit')
+    AND tc.input_summary IS NOT NULL
+  GROUP BY tc.input_summary ORDER BY sessions DESC LIMIT 25
+""", (sys.argv[2],)).fetchall()
+if not rows:
+    print(f"no files in project '{sys.argv[2]}'")
+else:
+    for r in rows: print(f"  {r[1]:>4}  {r[0]}  ({r[2]})")
+PY
 `````
 
 ### siblings
@@ -74,21 +87,27 @@ Sibling sessions = sessions in the same project, ordered by start_time, with the
 
 `````bash
 SESSION_ID="$1"
-sqlite3 -header -column "$DB" <<SQL
-WITH target AS (SELECT project_name, start_time FROM sessions WHERE id = '$SESSION_ID')
-SELECT s.id, s.start_time, s.first_user_prompt
-FROM sessions s, target t
-WHERE s.project_name = t.project_name
-  AND s.is_subagent = 0
-ORDER BY ABS(strftime('%s', s.start_time) - strftime('%s', t.start_time))
-LIMIT 5;
-SQL
+python3 - "$DB" "$SESSION_ID" <<'PY'
+import sqlite3, sys
+db = sqlite3.connect(sys.argv[1])
+target = db.execute("SELECT project_name, start_time FROM sessions WHERE id = ?", (sys.argv[2],)).fetchone()
+if not target:
+    print(f"session {sys.argv[2]} not found"); sys.exit(0)
+rows = db.execute("""
+  SELECT id, start_time, first_user_prompt FROM sessions
+  WHERE project_name = ? AND is_subagent = 0
+  ORDER BY ABS(strftime('%s', start_time) - strftime('%s', ?)) LIMIT 5
+""", (target[0], target[1])).fetchall()
+for r in rows: print(f"  {r[1]}  {r[0][:8]}  {(r[2] or '')[:80]}")
+PY
 `````
 
 ### summary
 
+The summary query takes no user input, so a plain sqlite3 invocation is fine.
+
 `````bash
-sqlite3 -header -column "$DB" <<SQL
+sqlite3 -header -column "$DB" <<'SQL'
 SELECT
   (SELECT COUNT(*) FROM sessions WHERE is_subagent = 0) AS sessions,
   (SELECT COUNT(DISTINCT project_name) FROM sessions WHERE project_name IS NOT NULL) AS projects,
