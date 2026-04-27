@@ -177,10 +177,36 @@ if you used `/cc:time-estimate`, `/cc:time-calibrate`, `/cc:time-benchmark`, or 
 
 cc 3.0 is **session mesh, period.** email-cc semantics for agents.
 
-## rollback
+## uninstall / rollback
+
+`/plugin uninstall cc` only flips the plugin's `enabledPlugins` flag in
+`settings.local.json`. The runtime data at `~/.claude/cc/` (sqlite DB,
+inbox, topics, questions) is left in place, and the marketplace cache
+under `~/.claude/plugins/cache/cc/cc/` lingers. For most users that's
+fine — reinstalling later picks up where you left off.
+
+For a true clean slate, run the cascade-uninstall script that ships
+with the plugin:
+
+```bash
+bash "$CLAUDE_PLUGIN_ROOT/bin/uninstall.sh"
+```
+
+(or, if `$CLAUDE_PLUGIN_ROOT` isn't set in your shell, point it at the
+plugin source directly: `bash plugins/cc/bin/uninstall.sh`)
+
+The script:
+
+1. stops any running `cc-server` child processes,
+2. wipes `~/.claude/cc/` (`--keep-data` to preserve it),
+3. removes the cc version cache under `~/.claude/plugins/cache/cc/cc/`,
+4. removes `cc@cc` from `enabledPlugins` in `settings.local.json`.
+
+Then **restart Claude Code** so any in-process MCP child is torn down.
+To reinstall fresh:
 
 ```
-/plugin uninstall cc
+/plugin install cc@cc
 ```
 
-no user-settings changes to reverse.
+The script is idempotent and safe to run multiple times.
