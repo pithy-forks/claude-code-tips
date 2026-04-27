@@ -41,7 +41,15 @@ echo "claude config dir : $CLAUDE_DIR"
 echo "runtime data      : $CC_DATA_DIR $([ -d "$CC_DATA_DIR" ] && echo '(exists)' || echo '(absent)')"
 echo "plugin cache      : $PLUGIN_CACHE $([ -d "$PLUGIN_CACHE" ] && echo '(exists)' || echo '(absent)')"
 echo "settings.local    : $SETTINGS_LOCAL $([ -f "$SETTINGS_LOCAL" ] && echo '(exists)' || echo '(absent)')"
-RUNNING=$(pgrep -fl 'cc-server-darwin\|cc-server-linux\|cc/server.ts\|cc/dist/cc-server' 2>/dev/null || true)
+# Match every shape the launcher can produce:
+#   - dist/cc-server-${OS}-${ARCH}        (compiled binary)
+#   - dist/cc-server                       (generic compiled binary)
+#   - bun .../plugins/cc/server.ts         (plugin source path)
+#   - bun .../plugins/cache/cc/cc/.../server.ts  (installed cache, with version dir)
+# Anchor each alternative on a discriminating substring so we don't match,
+# e.g., the bun process running this very script.
+PROC_RE='cc-server-darwin|cc-server-linux|cc-server$|/plugins/cc/server\.ts|/plugins/cache/cc/cc/.*/server\.ts'
+RUNNING=$(pgrep -fl "$PROC_RE" 2>/dev/null || true)
 if [ -n "$RUNNING" ]; then
   echo "running processes :"
   echo "$RUNNING" | sed 's/^/                    /'
@@ -59,10 +67,27 @@ fi
 # 1. stop any running cc-server processes (compiled binary + bun source)
 if [ -n "$RUNNING" ]; then
   echo "[1/4] stopping cc-server processes..."
+  # Detect "we are inside a parent Claude Code that owns one of these
+  # MCP children": if any RUNNING pid has its ppid equal to a process
+  # whose command contains 'claude' (the CC binary), warn -- killing
+  # the MCP only buys a second of peace before the parent restarts it.
+  parent_warn=0
+  for cc_pid in $(pgrep -f "$PROC_RE" 2>/dev/null); do
+    ppid=$(ps -o ppid= -p "$cc_pid" 2>/dev/null | tr -d ' ')
+    if [ -n "$ppid" ] && ps -o command= -p "$ppid" 2>/dev/null | grep -q -E 'claude|Claude'; then
+      parent_warn=1; break
+    fi
+  done
+  if [ "$parent_warn" -eq 1 ]; then
+    echo "      WARNING: an MCP child of a running Claude Code parent was found."
+    echo "      It will be killed, but the parent CC may respawn it on the next"
+    echo "      hook/tool call and recreate runtime state. Restart Claude Code"
+    echo "      after this script completes for a true reset."
+  fi
   # graceful first, then force
-  pkill -TERM -f 'cc-server-darwin\|cc-server-linux\|cc/server.ts\|cc/dist/cc-server' 2>/dev/null || true
+  pkill -TERM -f "$PROC_RE" 2>/dev/null || true
   sleep 1
-  pkill -KILL -f 'cc-server-darwin\|cc-server-linux\|cc/server.ts\|cc/dist/cc-server' 2>/dev/null || true
+  pkill -KILL -f "$PROC_RE" 2>/dev/null || true
   echo "      stopped"
 else
   echo "[1/4] no cc-server processes -- skipped"

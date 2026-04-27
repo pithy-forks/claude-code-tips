@@ -197,12 +197,18 @@ plugin source directly: `bash plugins/cc/bin/uninstall.sh`)
 
 The script:
 
-1. stops any running `cc-server` child processes,
+1. stops any running `cc-server` child processes (compiled binary or
+   bun-source forms),
 2. wipes `~/.claude/cc/` (`--keep-data` to preserve it),
 3. removes the cc version cache under `~/.claude/plugins/cache/cc/cc/`,
 4. removes `cc@cc` from `enabledPlugins` in `settings.local.json`.
 
-Then **restart Claude Code** so any in-process MCP child is torn down.
+> **Important: restart Claude Code afterwards.** If you run the script
+> from inside a CC session that has the cc plugin loaded, the parent CC
+> process will respawn the MCP child on the next hook fire and
+> recreate `~/.claude/cc/`. The script prints a warning when it detects
+> this. For a true reset: run the script, then quit and relaunch CC.
+
 To reinstall fresh:
 
 ```
