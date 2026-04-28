@@ -179,14 +179,27 @@ cc 3.0 is **session mesh, period.** email-cc semantics for agents.
 
 ## uninstall / rollback
 
-`/plugin uninstall cc` only flips the plugin's `enabledPlugins` flag in
-`settings.local.json`. The runtime data at `~/.claude/cc/` (sqlite DB,
-inbox, topics, questions) is left in place, and the marketplace cache
-under `~/.claude/plugins/cache/cc/cc/` lingers. For most users that's
-fine — reinstalling later picks up where you left off.
+three options, in increasing order of thoroughness.
 
-For a true clean slate, run the cascade-uninstall script that ships
-with the plugin:
+**1. CC's built-in (CC 2.1.121+)** — flips `enabledPlugins` and removes
+the marketplace install, with optional dependency cascade:
+
+```
+claude plugin uninstall cc --prune
+```
+
+`--prune` runs `claude plugin autoremove` after, cleaning up any
+auto-installed deps that are no longer needed (none for cc today, but
+correct hygiene). Add `-y` if you're invoking from a script or
+non-TTY context. This does **not** touch runtime data at
+`~/.claude/channels/cc/` or the version cache at
+`~/.claude/plugins/cache/cc/cc/`.
+
+**2. /plugin uninstall cc inside Claude Code** — same as the CLI form
+but no `--prune` flag is plumbed through; data and cache stay.
+
+**3. Cascade uninstall (full reset)** — for a true clean slate
+including runtime state, run the script that ships with the plugin:
 
 ```bash
 bash "$CLAUDE_PLUGIN_ROOT/bin/uninstall.sh"
@@ -199,15 +212,16 @@ The script:
 
 1. stops any running `cc-server` child processes (compiled binary or
    bun-source forms),
-2. wipes `~/.claude/cc/` (`--keep-data` to preserve it),
+2. wipes `~/.claude/channels/cc/` (`--keep-data` to preserve it),
 3. removes the cc version cache under `~/.claude/plugins/cache/cc/cc/`,
 4. removes `cc@cc` from `enabledPlugins` in `settings.local.json`.
 
 > **Important: restart Claude Code afterwards.** If you run the script
 > from inside a CC session that has the cc plugin loaded, the parent CC
 > process will respawn the MCP child on the next hook fire and
-> recreate `~/.claude/cc/`. The script prints a warning when it detects
-> this. For a true reset: run the script, then quit and relaunch CC.
+> recreate `~/.claude/channels/cc/`. The script prints a warning when it
+> detects this. For a true reset: run the script, then quit and
+> relaunch CC.
 
 To reinstall fresh:
 
@@ -216,3 +230,18 @@ To reinstall fresh:
 ```
 
 The script is idempotent and safe to run multiple times.
+
+## reliability notes
+
+**MCP auto-retry (CC 2.1.121+).** If cc's MCP server fails to start —
+bun not installed, dependency install timed out, transient port issue
+— Claude Code retries automatically with exponential backoff. You no
+longer need to `/reload-plugins` after a flaky first start. Look for
+`cc: ...` lines in CC's MCP debug output (`claude --mcp-debug`) if
+something looks off.
+
+**Eager load.** cc declares `alwaysLoad: true` in its `.mcp.json`, so
+its 5-tool surface and cross-session digest are available the moment
+the session starts rather than being deferred behind tool-search. cc is
+foundational infra (every session sends/receives messages) so the ~2KB
+of tool schemas in startup is the right tradeoff.
