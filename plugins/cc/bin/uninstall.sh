@@ -43,7 +43,12 @@ elif [ -d "$CC_DATA_DIR_V2" ] && [ ! -L "$CC_DATA_DIR_V2" ]; then
   CC_DATA_DIR="$CC_DATA_DIR_V2"
 fi
 PLUGIN_CACHE="$CLAUDE_DIR/plugins/cache/cc/cc"
+# Both settings files are scanned for enabledPlugins entries -- CC merges
+# them at load time, so leaving cc@cc in either one keeps the plugin live.
+# The first cut of this script only cleaned settings.local.json, which
+# missed users who had cc@cc enabled in the global file.
 SETTINGS_LOCAL="$CLAUDE_DIR/settings.local.json"
+SETTINGS_GLOBAL="$CLAUDE_DIR/settings.json"
 
 echo "cc plugin cascade uninstall"
 echo "==========================="
@@ -169,11 +174,20 @@ else
   echo "[3/4] no plugin cache -- skipped"
 fi
 
-# 4. disable the plugin in settings.local.json. We use python3 to edit
-# the JSON in-place so we don't depend on jq being installed.
-if [ -f "$SETTINGS_LOCAL" ] && command -v python3 >/dev/null 2>&1; then
-  python3 - "$SETTINGS_LOCAL" <<'PY'
-import json, sys
+# 4. disable the plugin in BOTH settings files. CC merges enabledPlugins
+# from settings.json (global) and settings.local.json (per-project), so
+# leaving cc@cc in either one keeps the plugin live. python3 edits each
+# file in place so we don't depend on jq being installed.
+if ! command -v python3 >/dev/null 2>&1; then
+  echo "[4/4] python3 unavailable -- skipping settings cleanup"
+else
+  for SETTINGS in "$SETTINGS_GLOBAL" "$SETTINGS_LOCAL"; do
+    if [ ! -f "$SETTINGS" ]; then
+      echo "[4/4] $(basename "$SETTINGS") absent -- skipped"
+      continue
+    fi
+    python3 - "$SETTINGS" <<'PY'
+import json, os, sys
 path = sys.argv[1]
 with open(path) as f:
     data = json.load(f)
@@ -182,17 +196,17 @@ removed = []
 for key in list(ep.keys()):
     if key == "cc@cc" or key.startswith("cc@"):
         del ep[key]; removed.append(key)
-if not ep and "enabledPlugins" in data:
-    del data["enabledPlugins"]
-elif "enabledPlugins" in data:
+# Preserve the key with empty value rather than deleting it -- the user's
+# settings.json may have other plugin keys we want to keep, and an empty
+# {} is still a valid setting that documents intent.
+if "enabledPlugins" in data:
     data["enabledPlugins"] = ep
 with open(path, "w") as f:
     json.dump(data, f, indent=2)
     f.write("\n")
-print(f"[4/4] settings.local.json: removed {removed or 'nothing (cc not enabled)'}")
+print(f"[4/4] {os.path.basename(path)}: removed {removed or 'nothing (cc not enabled)'}")
 PY
-else
-  echo "[4/4] settings.local.json missing or python3 unavailable -- skipped"
+  done
 fi
 
 echo
