@@ -5,7 +5,7 @@
     "": {
       "name": "cc",
       "dependencies": {
-        "@modelcontextprotocol/sdk": "^1.12.1",
+        "@modelcontextprotocol/sdk": "^1.29.0",
         "zod": "^3.23.8",
         "zod-to-json-schema": "^3.23.0",
       },
