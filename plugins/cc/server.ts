@@ -247,6 +247,34 @@ function newId(prefix: string): string {
   return `${prefix}_${randomBytes(5).toString("hex")}`;
 }
 
+/**
+ * Mark this session's row as ended and remove its inbox dir + per-session
+ * state. Idempotent and called from two places:
+ *   - cc_cleanup tool body, for explicit early teardown.
+ *   - shutdown(), so a normal exit (stdin EOF, SIGTERM, SIGINT) cleans up
+ *     without requiring a tool call.
+ * Note: subscriptions/recent_files are also wiped because they FK on
+ * session_id and have no use after the session ends.
+ */
+function cleanupSelf(): void {
+  if (!MY_SESSION_ID) return;
+  try {
+    db.prepare(`UPDATE sessions SET ended_at_ms = ? WHERE id = ?`).run(
+      now(),
+      MY_SESSION_ID,
+    );
+    db.prepare(`DELETE FROM subscriptions WHERE session_id = ?`).run(MY_SESSION_ID);
+    db.prepare(`DELETE FROM recent_files WHERE session_id = ?`).run(MY_SESSION_ID);
+  } catch {
+    // db may already be closing during shutdown; best-effort
+  }
+  try {
+    fs.rmSync(path.join(INBOX_DIR, MY_SESSION_ID), { recursive: true, force: true });
+  } catch {
+    // already gone
+  }
+}
+
 function isLiveSession(row: { last_seen_at_ms: number; ended_at_ms: number | null }): boolean {
   if (row.ended_at_ms) return false;
   return now() - row.last_seen_at_ms <= STALE_SESSION_AFTER_MS;
@@ -998,16 +1026,7 @@ server.setRequestHandler(CallToolRequestSchema, async (req) => {
 
   // ---- cleanup ----
   if (action === "cleanup") {
-    if (MY_SESSION_ID) {
-      db.prepare(`UPDATE sessions SET ended_at_ms = ? WHERE id = ?`).run(now(), MY_SESSION_ID);
-      db.prepare(`DELETE FROM subscriptions WHERE session_id = ?`).run(MY_SESSION_ID);
-      db.prepare(`DELETE FROM recent_files WHERE session_id = ?`).run(MY_SESSION_ID);
-      try {
-        fs.rmSync(path.join(INBOX_DIR, MY_SESSION_ID), { recursive: true, force: true });
-      } catch {
-        // already gone
-      }
-    }
+    cleanupSelf();
     return text(JSON.stringify({ ok: true }));
   }
 
@@ -1085,6 +1104,12 @@ function shutdown(): void {
   } catch {
     // noop
   }
+  // v3: cleanup runs here instead of from a SessionEnd hook. Hooks were
+  // dropped because the channel push notification and explicit cc_check
+  // calls cover all the awareness paths the SessionStart/UserPromptSubmit
+  // hooks used to serve, and SessionEnd cleanup is a strict subset of
+  // shutdown.
+  cleanupSelf();
   try {
     db.close();
   } catch {
