@@ -33,8 +33,8 @@ CREATE TABLE IF NOT EXISTS sessions (
 );
 CREATE INDEX IF NOT EXISTS idx_sessions_last_seen ON sessions(last_seen_at_ms);
 CREATE INDEX IF NOT EXISTS idx_sessions_ended ON sessions(ended_at_ms);
-CREATE INDEX IF NOT EXISTS idx_sessions_project ON sessions(project_root, ended_at_ms);
-CREATE INDEX IF NOT EXISTS idx_sessions_branch ON sessions(branch, ended_at_ms);
+-- Indexes that reference v3 columns are created in db/migrate.ts after the
+-- ADD COLUMN step, so they apply cleanly to upgraded v2 databases.
 
 CREATE TABLE IF NOT EXISTS topics (
   name TEXT PRIMARY KEY,
@@ -59,8 +59,7 @@ CREATE TABLE IF NOT EXISTS recent_files (
 );
 CREATE INDEX IF NOT EXISTS idx_recent_files_touched ON recent_files(touched_at_ms);
 CREATE INDEX IF NOT EXISTS idx_recent_files_path ON recent_files(path);
-CREATE INDEX IF NOT EXISTS idx_recent_files_branch ON recent_files(path, branch);
-CREATE INDEX IF NOT EXISTS idx_recent_files_worktree ON recent_files(path, worktree_root);
+-- v3 (path, branch) and (path, worktree_root) indexes added in db/migrate.ts
 
 CREATE TABLE IF NOT EXISTS announcements (
   id TEXT PRIMARY KEY,

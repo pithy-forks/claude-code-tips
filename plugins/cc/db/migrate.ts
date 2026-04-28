@@ -31,6 +31,16 @@ export function openDb(dbPath: string): Database {
     ["branch", "TEXT"],
     ["worktree_root", "TEXT"],
   ]);
+  // v3 indexes referencing columns added above. CREATE INDEX IF NOT EXISTS in
+  // schema.sql cannot run before the ADD COLUMN, so they live here.
+  for (const stmt of [
+    "CREATE INDEX IF NOT EXISTS idx_sessions_project ON sessions(project_root, ended_at_ms)",
+    "CREATE INDEX IF NOT EXISTS idx_sessions_branch ON sessions(branch, ended_at_ms)",
+    "CREATE INDEX IF NOT EXISTS idx_recent_files_branch ON recent_files(path, branch)",
+    "CREATE INDEX IF NOT EXISTS idx_recent_files_worktree ON recent_files(path, worktree_root)",
+  ]) {
+    db.exec(stmt);
+  }
   return db;
 }
 
@@ -45,12 +55,23 @@ function applyAdditiveColumns(
   table: string,
   columns: Array<[name: string, type: string]>,
 ): void {
+  // pragma_table_info doesn't accept bound parameters in sqlite; the function
+  // signature is `pragma_table_info('literal_table_name')`. Caller passes a
+  // hardcoded table name from this file, never user input, so the
+  // interpolation is safe; we still validate to prevent accidental
+  // refactoring footguns.
+  if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(table)) {
+    throw new Error(`applyAdditiveColumns: invalid table identifier ${table}`);
+  }
   const present = new Set(
-    (db.query(`SELECT name FROM pragma_table_info(?)`).all(table) as Array<{
+    (db.query(`SELECT name FROM pragma_table_info('${table}')`).all() as Array<{
       name: string;
     }>).map((r) => r.name),
   );
   for (const [name, type] of columns) {
+    if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(name)) {
+      throw new Error(`applyAdditiveColumns: invalid column identifier ${name}`);
+    }
     if (present.has(name)) continue;
     try {
       db.exec(`ALTER TABLE ${table} ADD COLUMN ${name} ${type}`);
