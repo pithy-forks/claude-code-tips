@@ -35,6 +35,7 @@ import {
   type Action,
   type ActionName,
 } from "./lib/action.js";
+import { Lifecycle } from "./lib/lifecycle.js";
 
 // --- single source of truth for the server version ---
 // Bun reads package.json at compile time when the server is built with
@@ -290,31 +291,51 @@ if (MY_SESSION_ID) {
   fs.mkdirSync(path.join(INBOX_DIR, MY_SESSION_ID), { recursive: true });
 }
 
-const heartbeat = setInterval(() => {
-  if (!MY_SESSION_ID) return;
-  try {
-    // Refresh git context: branch may have changed since last heartbeat
-    // (user ran git checkout; subagent rebased; etc.).
-    myGitContext = readGitContext(MY_CWD);
-    db.prepare(
-      `UPDATE sessions SET last_seen_at_ms = ?, branch = ?, worktree_root = ?, project_root = ? WHERE id = ?`,
-    ).run(
-      now(),
-      myGitContext.branch,
-      myGitContext.worktree_root,
-      myGitContext.project_root,
-      MY_SESSION_ID,
-    );
-  } catch {
-    // ignore transient sqlite busy / git failures
-  }
-}, HEARTBEAT_MS);
-heartbeat.unref?.();
+// --- lifecycle: heartbeat + transcript tail + inbox watcher + db close
+//
+// Each background concern is registered as a Resource. Lifecycle.start()
+// fires after MCP transport connects (so notifications can flow); stop() is
+// LIFO at shutdown. Errors during stop() log to stderr but never block the
+// rest of the cleanup path -- a half-shutdown is better than a stuck process.
+const lifecycle = new Lifecycle();
 
-// --- transcript tail (optional, graceful) ---
+let heartbeatTimer: ReturnType<typeof setInterval> | null = null;
+lifecycle.add({
+  name: "heartbeat",
+  start: () => {
+    if (!MY_SESSION_ID) return;
+    heartbeatTimer = setInterval(() => {
+      try {
+        // Refresh git context: branch may have changed since last beat
+        // (user ran git checkout; subagent rebased; etc.).
+        myGitContext = readGitContext(MY_CWD);
+        db.prepare(
+          `UPDATE sessions SET last_seen_at_ms = ?, branch = ?, worktree_root = ?, project_root = ? WHERE id = ?`,
+        ).run(
+          now(),
+          myGitContext.branch,
+          myGitContext.worktree_root,
+          myGitContext.project_root,
+          MY_SESSION_ID,
+        );
+      } catch {
+        // ignore transient sqlite busy / git failures
+      }
+    }, HEARTBEAT_MS);
+    heartbeatTimer.unref?.();
+  },
+  stop: () => {
+    if (heartbeatTimer) clearInterval(heartbeatTimer);
+    heartbeatTimer = null;
+  },
+});
 
-const stopTail = MY_SESSION_ID
-  ? startTranscriptTail({
+let transcriptTailStop: (() => void) | null = null;
+lifecycle.add({
+  name: "transcript-tail",
+  start: () => {
+    if (!MY_SESSION_ID) return;
+    transcriptTailStop = startTranscriptTail({
       db,
       sessionId: MY_SESSION_ID,
       cwd: MY_CWD,
@@ -322,8 +343,13 @@ const stopTail = MY_SESSION_ID
         branch: myGitContext.branch,
         worktree_root: myGitContext.worktree_root,
       }),
-    })
-  : () => {};
+    });
+  },
+  stop: () => {
+    transcriptTailStop?.();
+    transcriptTailStop = null;
+  },
+});
 
 // --- helpers ---
 
@@ -1004,25 +1030,23 @@ server.setRequestHandler(CallToolRequestSchema, async (req) => {
   }
 });
 
-// --- connect ---
-
-const transport = new StdioServerTransport();
-await server.connect(transport);
-
-// --- tier 2: channel push (optional, idempotent) ---
-
-if (MY_SESSION_ID) {
-  const myInbox = path.join(INBOX_DIR, MY_SESSION_ID);
-  try {
-    fs.watch(myInbox, (_event, filename) => {
+// --- inbox watcher (Tier 2 channel push) ---
+//
+// Registered before connect() so the watcher exists by the time we call
+// lifecycle.start(). Uses server.notification() to push channel events on the
+// open MCP transport -- runtime ignores these unless --channels is active.
+let inboxWatcher: fs.FSWatcher | null = null;
+lifecycle.add({
+  name: "inbox-watch",
+  start: () => {
+    if (!MY_SESSION_ID) return;
+    const myInbox = path.join(INBOX_DIR, MY_SESSION_ID);
+    inboxWatcher = fs.watch(myInbox, (_event, filename) => {
       if (!filename || !filename.endsWith(".msg") || filename.startsWith(".")) return;
       const fp = path.join(myInbox, filename);
       try {
         const content = fs.readFileSync(fp, "utf-8");
         const m = parseMsgFile(content);
-        // Tier 2 push: runtime ignores if --channels not active. Tier 1 still picks up
-        // via the next UserPromptSubmit hook's check call; files are consumed on read
-        // by the digest pass (not here), so both paths converge.
         server.notification({
           method: "notifications/claude/channel",
           params: {
@@ -1034,45 +1058,42 @@ if (MY_SESSION_ID) {
         // file may have been consumed
       }
     });
-  } catch (err) {
-    process.stderr.write(`cc: inbox watch failed: ${err}\n`);
-  }
-}
+  },
+  stop: () => {
+    inboxWatcher?.close();
+    inboxWatcher = null;
+  },
+});
 
-// --- graceful shutdown ---
+// --- self-cleanup + db close (LIFO: db is the deepest dependency) ---
+//
+// Cleanup runs here instead of from a SessionEnd hook. Hooks were dropped
+// because channel push + explicit cc.check cover every path SessionStart and
+// UserPromptSubmit used to serve, and SessionEnd cleanup is a strict subset
+// of shutdown.
+lifecycle.add({
+  name: "cleanup-self",
+  stop: () => cleanupSelf(),
+});
+lifecycle.add({
+  name: "db",
+  stop: () => db.close(),
+});
 
-// When Claude Code closes the MCP transport, stdin gets EOF. Without an
-// explicit handler the heartbeat interval and inbox watcher keep this
-// process alive forever as a zombie holding the sqlite db open. The 4 stale
-// `bun .../cache/cc/cc/<version>/server.ts` processes that bin/uninstall.sh
-// has to pkill on every reset are the symptom this fixes.
+// --- connect MCP transport, then start lifecycle ---
+
+const transport = new StdioServerTransport();
+await server.connect(transport);
+await lifecycle.start();
+
+// --- shutdown wiring ---
+
 let shuttingDown = false;
 function shutdown(): void {
   if (shuttingDown) return;
   shuttingDown = true;
   process.stderr.write("cc: shutting down\n");
-  try {
-    stopTail();
-  } catch {
-    // noop
-  }
-  try {
-    clearInterval(heartbeat);
-  } catch {
-    // noop
-  }
-  // v3: cleanup runs here instead of from a SessionEnd hook. Hooks were
-  // dropped because the channel push notification and explicit cc_check
-  // calls cover all the awareness paths the SessionStart/UserPromptSubmit
-  // hooks used to serve, and SessionEnd cleanup is a strict subset of
-  // shutdown.
-  cleanupSelf();
-  try {
-    db.close();
-  } catch {
-    // noop
-  }
-  process.exit(0);
+  lifecycle.stop().finally(() => process.exit(0));
 }
 
 process.stdin.on("end", shutdown);
