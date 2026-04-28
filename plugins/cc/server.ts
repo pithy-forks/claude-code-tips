@@ -27,6 +27,7 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 import * as os from "node:os";
 import { randomBytes } from "node:crypto";
+import { z } from "zod";
 
 import { openDb, migrateLegacyStateDir } from "./db/migrate.js";
 import { startTranscriptTail } from "./lib/transcript-tail.js";
@@ -76,11 +77,28 @@ const MY_SESSION_ID = process.env.CLAUDE_SESSION_ID || "";
 const MY_CWD = process.cwd();
 const MY_PID = process.pid;
 
-const STALE_SESSION_AFTER_MS = 5 * 60 * 1000;
-const ANNOUNCE_WINDOW_MS = 30 * 60 * 1000;
-const OVERLAP_WINDOW_MS = 10 * 60 * 1000;
-const HEARTBEAT_MS = 30 * 1000;
-const MSG_TTL_MS = 6 * 60 * 60 * 1000;
+// --- env-driven config ---
+// Each constant has a sensible default; advanced users override via env. The
+// imessage plugin treats config as boundary state -- code reads it once at
+// boot, never mid-call. Same here. CC_STATIC_MODE pins all of these to their
+// values at boot and refuses any runtime mutation that would change them.
+function envInt(name: string, fallback: number): number {
+  const raw = process.env[name];
+  if (!raw) return fallback;
+  const n = Number(raw);
+  if (!Number.isFinite(n) || n <= 0) {
+    process.stderr.write(`cc: ignoring invalid ${name}=${raw}, using ${fallback}\n`);
+    return fallback;
+  }
+  return n;
+}
+
+const STATIC_MODE = process.env.CC_STATIC_MODE === "true";
+const STALE_SESSION_AFTER_MS = envInt("CC_STALE_SESSION_MS", 5 * 60 * 1000);
+const ANNOUNCE_WINDOW_MS = envInt("CC_ANNOUNCE_WINDOW_MS", 30 * 60 * 1000);
+const OVERLAP_WINDOW_MS = envInt("CC_OVERLAP_WINDOW_MS", 10 * 60 * 1000);
+const HEARTBEAT_MS = envInt("CC_HEARTBEAT_MS", 30 * 1000);
+const MSG_TTL_MS = envInt("CC_MSG_TTL_MS", 6 * 60 * 60 * 1000);
 
 // --- bootstrap fs state ---
 
@@ -590,14 +608,137 @@ function text(s: string) {
   return { content: [{ type: "text" as const, text: s }] };
 }
 
+function errorText(s: string) {
+  return { content: [{ type: "text" as const, text: s }], isError: true as const };
+}
+
+// --- input schemas (zod) -----------------------------------------------------
+// Single source of truth for what args each verb accepts. Failures throw
+// ZodError, which is caught by the wrapper below and surfaced as isError.
+const urgencySchema = z.enum(["low", "normal", "urgent", "question"]);
+
+const ArgsByAction = {
+  sessions: z.object({ include_self: z.boolean().optional() }).strict(),
+  send: z
+    .object({
+      to: z.string().optional(),
+      topic: z.string().optional(), // accepted but ignored in v3 (commit 5)
+      message: z.string().min(1, "'message' is required"),
+      subject: z.string().optional(),
+      urgency: urgencySchema.optional(),
+      meta: z.record(z.unknown()).optional(),
+    })
+    .strict()
+    .refine((v) => v.to || v.topic, {
+      message: "provide 'to' (session name) or 'topic'",
+    }),
+  announce: z
+    .object({
+      summary: z.string().min(1, "'summary' is required"),
+      detail: z.string().optional(),
+      topics: z.array(z.string()).optional(),
+    })
+    .strict(),
+  check: z.object({ since_s: z.number().positive().optional() }).strict(),
+  subscribe: z
+    .object({ topic: z.string().min(1), role: z.string().optional() })
+    .strict(),
+  unsubscribe: z.object({ topic: z.string().min(1) }).strict(),
+  cleanup: z.object({}).strict(),
+  ask: z.object({}).passthrough(), // not wired
+  answer: z.object({}).passthrough(), // not wired
+} as const;
+
+// --- exfil guard -------------------------------------------------------------
+// Refuse to embed strings in outbound messages that resolve into the cc state
+// dir. Without this, a malicious peer could prompt-inject the recipient's
+// model into echoing back the contents of $CC_DIR/sessions.db or anything
+// else under CC_DIR via meta or message body. Mirrors imessage's
+// assertSendable -- the LLM has plenty of legitimate ways to send paths;
+// the *one* it must never send is its own channel state.
+function assertNotChannelState(value: unknown, fieldHint: string): void {
+  if (value == null) return;
+  if (typeof value === "string") {
+    let real: string;
+    try {
+      real = fs.realpathSync(value);
+    } catch {
+      return; // path doesn't resolve; assume it's not a path string
+    }
+    let stateReal: string;
+    try {
+      stateReal = fs.realpathSync(CC_DIR);
+    } catch {
+      return;
+    }
+    if (real === stateReal || real.startsWith(stateReal + path.sep)) {
+      throw new Error(
+        `refusing to send channel state path in '${fieldHint}': ${value}`,
+      );
+    }
+    return;
+  }
+  if (Array.isArray(value)) {
+    for (const v of value) assertNotChannelState(v, fieldHint);
+    return;
+  }
+  if (typeof value === "object") {
+    for (const [k, v] of Object.entries(value as Record<string, unknown>)) {
+      assertNotChannelState(v, `${fieldHint}.${k}`);
+    }
+  }
+}
+
 server.setRequestHandler(CallToolRequestSchema, async (req) => {
-  if (req.params.name !== "cc") return text("Unknown tool.");
-  const args = (req.params.arguments ?? {}) as Record<string, unknown>;
-  const action = String(args.action ?? "");
+  if (req.params.name !== "cc") return errorText(`unknown tool: ${req.params.name}`);
+  const rawArgs = (req.params.arguments ?? {}) as Record<string, unknown>;
+  const action = String(rawArgs.action ?? "");
+
+  if (!(action in ArgsByAction)) {
+    return errorText(
+      `cc: unknown action '${action}'. valid: ${Object.keys(ArgsByAction).join(", ")}`,
+    );
+  }
+  const schema = ArgsByAction[action as keyof typeof ArgsByAction];
+  const { action: _, ...rest } = rawArgs;
+  const parsed = schema.safeParse(rest);
+  if (!parsed.success) {
+    return errorText(
+      `cc.${action}: ${parsed.error.issues.map((i) => i.message).join("; ")}`,
+    );
+  }
+  const args = parsed.data as Record<string, unknown>;
+
+  // Re-cast to keep the legacy verb bodies' code shape (they read off
+  // 'args.<field>' as unknown). Zod has already validated each field's type.
+  for (const [k, v] of Object.entries(args)) {
+    (rawArgs as Record<string, unknown>)[k] = v;
+  }
 
   if (!MY_SESSION_ID && action !== "sessions") {
-    return text("cc: CLAUDE_SESSION_ID not set; most verbs disabled.");
+    return errorText("cc: CLAUDE_SESSION_ID not set; most verbs disabled.");
   }
+
+  // Exfil guard: applied per-action below where outbound payloads are built.
+  // The 'send' and 'announce' verbs construct .msg files / db rows that the
+  // recipient's model will read; we sweep those fields here.
+  if (action === "send" || action === "announce") {
+    try {
+      assertNotChannelState(args.message ?? args.summary, "message/summary");
+      if (args.subject) assertNotChannelState(args.subject, "subject");
+      if (args.detail) assertNotChannelState(args.detail, "detail");
+      if (args.meta) assertNotChannelState(args.meta, "meta");
+    } catch (err) {
+      return errorText(
+        `cc.${action}: ${err instanceof Error ? err.message : String(err)}`,
+      );
+    }
+  }
+
+  // (Wrapping the rest of the handler in try/catch so any thrown error from
+  // the legacy verb bodies surfaces with isError: true instead of being
+  // silently swallowed.)
+  try {
 
   // ---- sessions ----
   if (action === "sessions") {
@@ -759,7 +900,13 @@ server.setRequestHandler(CallToolRequestSchema, async (req) => {
     );
   }
 
-  return text(`cc: unknown action '${action}'.`);
+  // Unreachable: the action-not-in-ArgsByAction guard at the top returns first.
+  return errorText(`cc: unknown action '${action}'.`);
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    process.stderr.write(`cc.${action}: ${msg}\n`);
+    return errorText(`cc.${action} failed: ${msg}`);
+  }
 });
 
 // --- connect ---
