@@ -31,7 +31,10 @@ export type SessionDigest = {
 export type OverlapAlert = {
   file: string;
   other_sessions: string[];
-  both_touched_within_s: number;
+  // v3: structural reason for the alert. v2's both_touched_within_s
+  // (10-min sliding window) is gone; alerts now fire on shared substrate
+  // (same git branch and/or same worktree) regardless of timing.
+  reason: "same-branch" | "same-worktree" | "same-branch+worktree";
 };
 
 export type QuestionAwaitingMe = {
@@ -138,7 +141,13 @@ export function renderDigest(d: Digest): string {
     lines.push("file overlap:");
     for (const o of d.file_overlap_alerts) {
       const others = o.other_sessions.join(", ");
-      lines.push(`- ${shortPath(o.file)}: also touched by ${others} within ${formatAge(o.both_touched_within_s)}. coordinate via /cc send or /cc subscribe`);
+      const reasonText =
+        o.reason === "same-branch+worktree"
+          ? "same branch + worktree"
+          : o.reason === "same-branch"
+            ? "same branch"
+            : "same worktree";
+      lines.push(`- ${shortPath(o.file)}: also touched by ${others} (${reasonText}). coordinate via cc.send before continuing.`);
     }
   }
 

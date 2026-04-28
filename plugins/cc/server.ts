@@ -122,20 +122,86 @@ const db = openDb(DB_PATH);
 const MY_SHORT_ID = MY_SESSION_ID ? MY_SESSION_ID.slice(0, 8) : "";
 const MY_CWD_BASENAME = path.basename(MY_CWD) || MY_SHORT_ID;
 
+// --- git context (branch + worktree root + project root) ---
+// Resolved at session start and refreshed on heartbeat. Populates the
+// sessions.* and recent_files.* columns the file-overlap detector reads.
+// Caching for the 60s window between heartbeats means a branch switch
+// shows up to peers within ~30-60s, which is fine for awareness.
+import { spawnSync } from "node:child_process";
+
+type GitContext = {
+  branch: string | null;
+  worktree_root: string | null;
+  project_root: string | null;
+};
+
+let myGitContext: GitContext = { branch: null, worktree_root: null, project_root: null };
+
+function readGitContext(cwd: string): GitContext {
+  const opts = { cwd, encoding: "utf-8" as const, timeout: 1500 };
+  const branchRes = spawnSync(
+    "git",
+    ["rev-parse", "--abbrev-ref", "HEAD"],
+    opts,
+  );
+  const worktreeRes = spawnSync("git", ["rev-parse", "--show-toplevel"], opts);
+  // common-dir resolves the *primary* repo for both the main repo and any
+  // linked worktree. show-toplevel is the worktree path; common-dir lets us
+  // distinguish "different worktrees of the same repo" from "totally
+  // different repos." Worktree paths differ; common-dir is shared.
+  const commonRes = spawnSync(
+    "git",
+    ["rev-parse", "--git-common-dir"],
+    opts,
+  );
+  const branch =
+    branchRes.status === 0 ? branchRes.stdout.trim() || null : null;
+  const worktree_root =
+    worktreeRes.status === 0 ? worktreeRes.stdout.trim() || null : null;
+  let project_root: string | null = null;
+  if (commonRes.status === 0) {
+    const commonDir = commonRes.stdout.trim();
+    // common-dir can be:
+    //   - "<abs>/.git"                                    primary repo, abs path
+    //   - "<abs>/.git/worktrees/<name>"                   linked worktree, abs
+    //   - "../.git" / "../../.git"                        primary repo, relative to cwd
+    //   - "../../.git/worktrees/<name>"                   linked worktree, relative
+    // Strip /.git[/worktrees/<name>] then resolve relative paths against cwd.
+    const stripped = commonDir.replace(/\/\.git(?:\/worktrees\/[^/]+)?$/, "");
+    project_root = path.isAbsolute(stripped)
+      ? stripped
+      : path.resolve(cwd, stripped);
+  }
+  return { branch, worktree_root, project_root };
+}
+
 // --- self-register ---
 
 const now = () => Date.now();
 
 if (MY_SESSION_ID) {
+  myGitContext = readGitContext(MY_CWD);
   db.prepare(
-    `INSERT INTO sessions (id, cwd, pid, started_at_ms, last_seen_at_ms, ended_at_ms)
-     VALUES (?, ?, ?, ?, ?, NULL)
+    `INSERT INTO sessions (id, cwd, project_root, branch, worktree_root, pid, started_at_ms, last_seen_at_ms, ended_at_ms)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, NULL)
      ON CONFLICT(id) DO UPDATE SET
        cwd = excluded.cwd,
+       project_root = excluded.project_root,
+       branch = excluded.branch,
+       worktree_root = excluded.worktree_root,
        pid = excluded.pid,
        last_seen_at_ms = excluded.last_seen_at_ms,
        ended_at_ms = NULL`,
-  ).run(MY_SESSION_ID, MY_CWD, MY_PID, now(), now());
+  ).run(
+    MY_SESSION_ID,
+    MY_CWD,
+    myGitContext.project_root,
+    myGitContext.branch,
+    myGitContext.worktree_root,
+    MY_PID,
+    now(),
+    now(),
+  );
 
   fs.mkdirSync(path.join(INBOX_DIR, MY_SESSION_ID), { recursive: true });
 }
@@ -143,12 +209,20 @@ if (MY_SESSION_ID) {
 const heartbeat = setInterval(() => {
   if (!MY_SESSION_ID) return;
   try {
-    db.prepare(`UPDATE sessions SET last_seen_at_ms = ? WHERE id = ?`).run(
+    // Refresh git context: branch may have changed since last heartbeat
+    // (user ran git checkout; subagent rebased; etc.).
+    myGitContext = readGitContext(MY_CWD);
+    db.prepare(
+      `UPDATE sessions SET last_seen_at_ms = ?, branch = ?, worktree_root = ?, project_root = ? WHERE id = ?`,
+    ).run(
       now(),
+      myGitContext.branch,
+      myGitContext.worktree_root,
+      myGitContext.project_root,
       MY_SESSION_ID,
     );
   } catch {
-    // ignore transient sqlite busy
+    // ignore transient sqlite busy / git failures
   }
 }, HEARTBEAT_MS);
 heartbeat.unref?.();
@@ -156,7 +230,15 @@ heartbeat.unref?.();
 // --- transcript tail (optional, graceful) ---
 
 const stopTail = MY_SESSION_ID
-  ? startTranscriptTail({ db, sessionId: MY_SESSION_ID, cwd: MY_CWD })
+  ? startTranscriptTail({
+      db,
+      sessionId: MY_SESSION_ID,
+      cwd: MY_CWD,
+      gitContext: () => ({
+        branch: myGitContext.branch,
+        worktree_root: myGitContext.worktree_root,
+      }),
+    })
   : () => {};
 
 // --- helpers ---
@@ -451,43 +533,107 @@ function computeDigest(opts: { since_ms?: number | null }): Digest {
     last_announce: lastAnnounceFor(p.id),
   }));
 
-  // file_overlap_alerts: join my recent_files with peers' recent_files on path,
-  // both touched within OVERLAP_WINDOW_MS
-  let overlapAlerts: Array<{ file: string; other_sessions: string[]; both_touched_within_s: number }> = [];
+  // file_overlap_alerts: v3 redesign. The v2 design used a 10-minute time
+  // window: "you both touched this file in the last 10 min." That's noisy
+  // (different worktrees of the same repo overlap on README.md every hour)
+  // and also stale when both sessions are still active for hours on the
+  // same branch.
+  //
+  // v3: a conflict requires shared *substrate*. We alert when:
+  //   1. another live session has touched the same path,
+  //   2. AND we share either the git branch OR the worktree root.
+  //
+  // No time window. recent_files has its own TTL purge (CC_MSG_TTL_MS) and
+  // peer staleness (STALE_SESSION_AFTER_MS) gates whether the peer counts
+  // at all. Subagents inherit the parent's session_id, so intra-session is
+  // already invisible.
+  //
+  // Realistic agentic conflicts NOT covered yet (each wants its own
+  // primitive, deferred to v4):
+  //   - shared dev server / port / DB
+  //   - concurrent rebase or push to the same remote branch
+  //   - lock-file ownership (.git/index.lock)
+  //   - long-running shell processes that mutate state
+  let overlapAlerts: Array<{
+    file: string;
+    other_sessions: string[];
+    reason: "same-branch" | "same-worktree" | "same-branch+worktree";
+  }> = [];
   if (MY_SESSION_ID) {
-    const cutoff = now() - OVERLAP_WINDOW_MS;
+    // Fetch my current branch and worktree from the sessions row -- these
+    // are populated by the heartbeat (see commit 6 helper below). Either or
+    // both can be NULL on first heartbeat or in non-git cwds; the SQL
+    // handles NULL by simply not matching.
+    const meRow = db
+      .prepare(`SELECT branch, worktree_root FROM sessions WHERE id = ?`)
+      .get(MY_SESSION_ID) as
+      | { branch: string | null; worktree_root: string | null }
+      | undefined;
+    const myBranch = meRow?.branch ?? null;
+    const myWorktree = meRow?.worktree_root ?? null;
+
     const rows = db
       .prepare(
-        `SELECT rf.path as path, rf.session_id as sid, rf.touched_at_ms as touched_at_ms,
-                s.name as name
+        `SELECT rf.path AS path,
+                rf.session_id AS sid,
+                rf.branch AS rf_branch,
+                rf.worktree_root AS rf_worktree,
+                s.cwd AS s_cwd
          FROM recent_files rf
          JOIN sessions s ON s.id = rf.session_id
-         WHERE rf.path IN (
-           SELECT path FROM recent_files WHERE session_id = ? AND touched_at_ms > ?
-         )
-         AND rf.session_id != ?
-         AND rf.touched_at_ms > ?
-         AND s.ended_at_ms IS NULL`,
+         WHERE rf.path IN (SELECT path FROM recent_files WHERE session_id = ?)
+           AND rf.session_id != ?
+           AND s.ended_at_ms IS NULL
+           AND s.last_seen_at_ms > ?
+           AND (
+             (? IS NOT NULL AND rf.branch = ?)
+             OR (? IS NOT NULL AND rf.worktree_root = ?)
+           )`,
       )
-      .all(MY_SESSION_ID, cutoff, MY_SESSION_ID, cutoff) as Array<{
+      .all(
+        MY_SESSION_ID,
+        MY_SESSION_ID,
+        now() - STALE_SESSION_AFTER_MS,
+        myBranch,
+        myBranch,
+        myWorktree,
+        myWorktree,
+      ) as Array<{
       path: string;
       sid: string;
-      touched_at_ms: number;
-      name: string;
+      rf_branch: string | null;
+      rf_worktree: string | null;
+      s_cwd: string;
     }>;
-    const byPath = new Map<string, { sessions: Set<string>; oldest: number }>();
+
+    const byPath = new Map<
+      string,
+      { sessions: Set<string>; sameBranch: boolean; sameWorktree: boolean }
+    >();
     for (const r of rows) {
-      const entry = byPath.get(r.path) ?? { sessions: new Set(), oldest: r.touched_at_ms };
-      entry.sessions.add(r.name || r.sid.slice(0, 8));
-      entry.oldest = Math.min(entry.oldest, r.touched_at_ms);
+      const entry =
+        byPath.get(r.path) ?? {
+          sessions: new Set<string>(),
+          sameBranch: false,
+          sameWorktree: false,
+        };
+      const peerLabel = `${r.sid.slice(0, 8)} @ ${path.basename(r.s_cwd)}`;
+      entry.sessions.add(peerLabel);
+      if (myBranch && r.rf_branch === myBranch) entry.sameBranch = true;
+      if (myWorktree && r.rf_worktree === myWorktree) entry.sameWorktree = true;
       byPath.set(r.path, entry);
     }
     overlapAlerts = [...byPath.entries()].map(([file, v]) => ({
       file,
       other_sessions: [...v.sessions],
-      both_touched_within_s: Math.max(0, Math.floor((now() - v.oldest) / 1000)),
+      reason:
+        v.sameBranch && v.sameWorktree
+          ? ("same-branch+worktree" as const)
+          : v.sameBranch
+            ? ("same-branch" as const)
+            : ("same-worktree" as const),
     }));
-    overlapAlerts.sort((a, b) => a.both_touched_within_s - b.both_touched_within_s);
+    overlapAlerts.sort((a, b) => a.file.localeCompare(b.file));
   }
 
   // questions (schema shipped; not returned in 2.0.0 beyond structure)
