@@ -155,3 +155,113 @@ Open until we have a clear use case driving the design.
 PID 94652 (`bun server.ts`, no path on argv) — survived smoke testing
 on 2026-04-28. Sandbox refused SIGKILL since the pid wasn't
 DB-verified. Will die naturally on user's next CC restart.
+
+---
+
+# CC 2.1.121 changelog adoption — items deferred from PR
+
+The PR shipping `alwaysLoad`, the README cascade docs, and the MCP
+auto-retry note also surfaced these. Captured here so a future
+session can pick them up with full rationale.
+
+## monitors manifest — needs investigation (deferred from PR)
+
+CC 2.1.121 added a `monitors` array to plugin manifests. The initial
+plan was to extract cc's inbox watcher (currently `fs.watch(myInbox,
+...)` in `server.ts`, ~line 1148) into a separate `monitor.ts`
+process and register it via `monitors`. **Don't ship this without
+verifying the contract first.**
+
+Why it's risky as planned: the watcher today calls
+`server.notification({ method: "notifications/claude/channel", ... })`
+which writes to the open stdio MCP transport CC is reading on the
+other side. That transport only exists in the running MCP server
+process. A separate monitor process would have no handle to it.
+
+What to verify before refactoring:
+
+1. Does a `monitors` entry communicate back to CC via stdout (hook-
+   style), via a different IPC channel, or via something that lets it
+   push into a *running* MCP session?
+2. If it's hook-style only, then the inbox watcher cannot be moved
+   without losing the Tier 2 `--channels` push path. Need a different
+   primitive.
+3. If `monitors` does support pushing to an MCP server's open
+   transport, we still need to confirm message delivery semantics
+   (in-order, at-least-once, delivery during the parent CC's idle
+   periods, etc.).
+
+Until verified, the `fs.watch` lives in server.ts and Tier 2 push
+keeps working.
+
+## PreCompact hook to protect cc-active sessions (CC 2.1.105)
+
+CC 2.1.105 introduced a `PreCompact` hook that fires before automatic
+compaction. cc could register one that decides whether to skip
+compaction this turn — e.g., if there's an unread DM in the digest
+or a peer has flagged file-overlap, hold off so the user sees the
+context before it gets summarized away.
+
+Considerations:
+- Has to be near-instant; PreCompact runs synchronously.
+- Returning a "skip compact" signal too aggressively defeats the
+  purpose of compaction. Right answer probably: skip only if a peer
+  is actively *blocking* on us (urgency=question or file-overlap).
+- Wire through cc.check with an `is_blocking_present` boolean, then
+  the PreCompact hook just queries that.
+
+## ${CLAUDE_EFFORT} for digest verbosity (CC 2.1.120)
+
+CC 2.1.120 exposes `${CLAUDE_EFFORT}` (low/medium/high) as a hook env
+var. cc.check could vary digest verbosity by effort: at low, only
+direct messages; at medium, current digest; at high, include peer
+file-recency tail and the file-overlap matrix. Saves tokens on
+short-burst sessions where the user just wants a fast yes/no.
+
+## Include cc state dirs in cleanupPeriodDays (CC 2.1.117)
+
+CC 2.1.117 added a `cleanupPeriodDays` setting that retention-sweeps
+plugin data dirs. cc currently keeps inbox/topics/questions
+indefinitely under `~/.claude/channels/cc/`. Hook into the same
+config (or a cc-specific override) so old messages get pruned on the
+same schedule.
+
+Implementation: a daily-or-on-startup pass that deletes .msg files
+older than the configured window from `inbox/<sid>/` and
+`topics/<topic>/`. Sessions table rows already have an `ended_at`
+column; sweep ended sessions whose `ended_at` exceeds the window.
+
+## Use duration_ms from PostToolUse for recent_files weighting (CC 2.1.119)
+
+CC 2.1.119 enriches PostToolUse hook payloads with `duration_ms`. cc's
+file-recency surface today treats every Edit/Write as a flat point.
+With duration_ms we can weight by tool-call cost: a 30-second
+formatting pass on a file matters less than a 4-minute targeted
+refactor. Future digest could surface the *expensive* recent files
+not just the *recent* ones.
+
+Wire-up: PostToolUse hook captures (tool, file, duration_ms),
+inserts into a `tool_calls` table, the digest renderer reads weighted
+recency.
+
+## Skill description token cap raised 250→1536 (CC 2.1.97)
+
+If we ever convert any `/cc:*` commands to skills (currently they're
+slash commands that call MCP tools), the higher description token
+cap means we can ship richer auto-trigger guidance without truncation.
+No action today; relevant only if the commands→skills migration
+happens.
+
+## Push notifications via Notifications tool (CC 2.1.110)
+
+CC 2.1.110 added system-level push notifications via the
+`Notifications` tool. cc could surface urgent peer DMs (urgency =
+question or blocked) as macOS notifications even when the agent isn't
+actively reading the digest. Useful for parallel-session workflows
+where the user is reading one CC pane while another is waiting on a
+peer response.
+
+Considerations:
+- Don't notify on every announcement. Filter to urgency >= question.
+- Rate-limit: at most one notification per peer per 5 minutes.
+- macOS focus modes already gate notifications; respect them.
