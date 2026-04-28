@@ -31,28 +31,65 @@ for arg in "$@"; do
 done
 
 CLAUDE_DIR="${CLAUDE_CONFIG_DIR:-$HOME/.claude}"
-CC_DATA_DIR="$CLAUDE_DIR/cc"
+# v3.0+ canonical state path; v2 path kept as fallback for users who haven't
+# upgraded yet. The server migrates v2 -> v3 on first start, so post-upgrade
+# the v2 path is a symlink we don't want to delete (it still resolves).
+CC_DATA_DIR_V3="$CLAUDE_DIR/channels/cc"
+CC_DATA_DIR_V2="$CLAUDE_DIR/cc"
+CC_DATA_DIR=""
+if [ -d "$CC_DATA_DIR_V3" ] && [ ! -L "$CC_DATA_DIR_V3" ]; then
+  CC_DATA_DIR="$CC_DATA_DIR_V3"
+elif [ -d "$CC_DATA_DIR_V2" ] && [ ! -L "$CC_DATA_DIR_V2" ]; then
+  CC_DATA_DIR="$CC_DATA_DIR_V2"
+fi
 PLUGIN_CACHE="$CLAUDE_DIR/plugins/cache/cc/cc"
 SETTINGS_LOCAL="$CLAUDE_DIR/settings.local.json"
 
 echo "cc plugin cascade uninstall"
 echo "==========================="
 echo "claude config dir : $CLAUDE_DIR"
-echo "runtime data      : $CC_DATA_DIR $([ -d "$CC_DATA_DIR" ] && echo '(exists)' || echo '(absent)')"
+echo "runtime data      : ${CC_DATA_DIR:-(absent)}"
 echo "plugin cache      : $PLUGIN_CACHE $([ -d "$PLUGIN_CACHE" ] && echo '(exists)' || echo '(absent)')"
 echo "settings.local    : $SETTINGS_LOCAL $([ -f "$SETTINGS_LOCAL" ] && echo '(exists)' || echo '(absent)')"
-# Match every shape the launcher can produce:
-#   - dist/cc-server-${OS}-${ARCH}        (compiled binary)
-#   - dist/cc-server                       (generic compiled binary)
-#   - bun .../plugins/cc/server.ts         (plugin source path)
-#   - bun .../plugins/cache/cc/cc/.../server.ts  (installed cache, with version dir)
-# Anchor each alternative on a discriminating substring so we don't match,
-# e.g., the bun process running this very script.
-PROC_RE='cc-server-darwin|cc-server-linux|cc-server$|/plugins/cc/server\.ts|/plugins/cache/cc/cc/.*/server\.ts'
-RUNNING=$(pgrep -fl "$PROC_RE" 2>/dev/null || true)
-if [ -n "$RUNNING" ]; then
+
+# v3 changes how cc is launched: was `bash launch.sh` -> `bun /full/path/to/server.ts`,
+# now `bun run --silent start` -> `bun server.ts` (no path on argv). The v2
+# pgrep pattern that matched `/plugins/cc/server\.ts` no longer catches
+# anything. Canonical source of truth instead: read live pids from the cc
+# database (sessions.pid where ended_at_ms IS NULL). Falls through to the
+# legacy regex for any process the DB missed (e.g. orphans from a hard
+# crash that wiped the row).
+RUNNING_PIDS=()
+if [ -n "$CC_DATA_DIR" ] && [ -f "$CC_DATA_DIR/sessions.db" ] && command -v sqlite3 >/dev/null 2>&1; then
+  while IFS= read -r pid; do
+    [ -n "$pid" ] && RUNNING_PIDS+=("$pid")
+  done < <(sqlite3 -noheader "$CC_DATA_DIR/sessions.db" \
+    "SELECT pid FROM sessions WHERE ended_at_ms IS NULL AND pid IS NOT NULL;" 2>/dev/null)
+fi
+# Legacy regex catch-net for orphans (compiled binary names + plugin-source path).
+PROC_RE_LEGACY='cc-server-darwin|cc-server-linux|cc-server$|/plugins/cc/server\.ts|/plugins/cache/cc/cc/.*/server\.ts'
+while IFS= read -r pid; do
+  [ -n "$pid" ] && RUNNING_PIDS+=("$pid")
+done < <(pgrep -f "$PROC_RE_LEGACY" 2>/dev/null || true)
+# Dedupe + filter out our own pid.
+declare -A SEEN=()
+FILTERED=()
+for pid in "${RUNNING_PIDS[@]}"; do
+  [ "$pid" = "$$" ] && continue
+  [ -n "${SEEN[$pid]:-}" ] && continue
+  SEEN[$pid]=1
+  # Verify the pid actually exists before claiming it.
+  kill -0 "$pid" 2>/dev/null || continue
+  FILTERED+=("$pid")
+done
+RUNNING_PIDS=("${FILTERED[@]}")
+
+if [ ${#RUNNING_PIDS[@]} -gt 0 ]; then
   echo "running processes :"
-  echo "$RUNNING" | sed 's/^/                    /'
+  for pid in "${RUNNING_PIDS[@]}"; do
+    cmd=$(ps -p "$pid" -o command= 2>/dev/null | head -1)
+    printf "                    %s  %s\n" "$pid" "$cmd"
+  done
 else
   echo "running processes : none"
 fi
@@ -64,15 +101,14 @@ if [ "$YES" -ne 1 ]; then
   case "$REPLY" in y|Y|yes|YES) ;; *) echo "aborted"; exit 0 ;; esac
 fi
 
-# 1. stop any running cc-server processes (compiled binary + bun source)
-if [ -n "$RUNNING" ]; then
-  echo "[1/4] stopping cc-server processes..."
-  # Detect "we are inside a parent Claude Code that owns one of these
-  # MCP children": if any RUNNING pid has its ppid equal to a process
-  # whose command contains 'claude' (the CC binary), warn -- killing
-  # the MCP only buys a second of peace before the parent restarts it.
+# 1. stop any running cc-server processes (DB-discovered + regex orphans)
+if [ ${#RUNNING_PIDS[@]} -gt 0 ]; then
+  echo "[1/4] stopping ${#RUNNING_PIDS[@]} cc-server process(es)..."
+  # Detect "we're inside a parent Claude Code that owns this MCP child":
+  # if any pid's ppid runs the 'claude' binary, warn -- killing only
+  # buys a second of peace before the parent respawns it.
   parent_warn=0
-  for cc_pid in $(pgrep -f "$PROC_RE" 2>/dev/null); do
+  for cc_pid in "${RUNNING_PIDS[@]}"; do
     ppid=$(ps -o ppid= -p "$cc_pid" 2>/dev/null | tr -d ' ')
     if [ -n "$ppid" ] && ps -o command= -p "$ppid" 2>/dev/null | grep -q -E 'claude|Claude'; then
       parent_warn=1; break
@@ -81,27 +117,45 @@ if [ -n "$RUNNING" ]; then
   if [ "$parent_warn" -eq 1 ]; then
     echo "      WARNING: an MCP child of a running Claude Code parent was found."
     echo "      It will be killed, but the parent CC may respawn it on the next"
-    echo "      hook/tool call and recreate runtime state. Restart Claude Code"
+    echo "      tool call and recreate runtime state. Restart Claude Code"
     echo "      after this script completes for a true reset."
   fi
-  # graceful first, then force
-  pkill -TERM -f "$PROC_RE" 2>/dev/null || true
+  # graceful first, then force.
+  for pid in "${RUNNING_PIDS[@]}"; do kill -TERM "$pid" 2>/dev/null || true; done
   sleep 1
-  pkill -KILL -f "$PROC_RE" 2>/dev/null || true
+  for pid in "${RUNNING_PIDS[@]}"; do kill -KILL "$pid" 2>/dev/null || true; done
   echo "      stopped"
 else
   echo "[1/4] no cc-server processes -- skipped"
 fi
 
 # 2. wipe runtime data (db, inbox, topics, questions). honors --keep-data.
+# Removes BOTH v3 path (~/.claude/channels/cc/) and v2 path (~/.claude/cc/)
+# if either still exists; the v2 path may be a real dir on never-upgraded
+# installs or a symlink left by the migration in db/migrate.ts.
 if [ "$KEEP_DATA" -eq 1 ]; then
-  echo "[2/4] keeping runtime data ($CC_DATA_DIR) -- skipped"
-elif [ -d "$CC_DATA_DIR" ]; then
-  echo "[2/4] removing runtime data: $CC_DATA_DIR"
-  rm -rf "$CC_DATA_DIR"
-  echo "      done"
+  echo "[2/4] keeping runtime data -- skipped"
 else
-  echo "[2/4] no runtime data -- skipped"
+  removed=0
+  if [ -d "$CC_DATA_DIR_V3" ] || [ -L "$CC_DATA_DIR_V3" ]; then
+    echo "[2/4] removing runtime data: $CC_DATA_DIR_V3"
+    rm -rf "$CC_DATA_DIR_V3"
+    removed=1
+  fi
+  if [ -L "$CC_DATA_DIR_V2" ]; then
+    echo "      removing legacy symlink: $CC_DATA_DIR_V2"
+    rm -f "$CC_DATA_DIR_V2"
+    removed=1
+  elif [ -d "$CC_DATA_DIR_V2" ]; then
+    echo "      removing legacy data dir: $CC_DATA_DIR_V2"
+    rm -rf "$CC_DATA_DIR_V2"
+    removed=1
+  fi
+  if [ "$removed" -eq 0 ]; then
+    echo "[2/4] no runtime data -- skipped"
+  else
+    echo "      done"
+  fi
 fi
 
 # 3. drop version cache. the marketplace cache is shared across plugins
