@@ -687,8 +687,15 @@ function computeDigest(opts: { since_ms?: number | null }): Digest {
 // v3 tool surface: 5 typed tools instead of one verb-dispatched 'cc' tool.
 // Aligns with the imessage plugin's per-tool layout. Each tool's
 // inputSchema only includes its own args, so the LLM's tool-selection
-// step picks the right shape automatically. Names are prefixed with
-// 'cc_' to keep the namespace tidy in /tools/list.
+// step picks the right shape automatically.
+//
+// TODO(naming): the 'cc_' prefix combined with the marketplace+plugin
+// double-naming produces 'mcp__plugin_cc_cc__cc_sessions' triple-cc
+// repetition. Imessage's tools are named 'reply' / 'chat_messages'
+// (no plugin-name prefix). Worth dropping the 'cc_' prefix here when
+// we cut a v3.1 -- final shape becomes 'mcp__plugin_cc_cc__sessions'.
+// Leaving as-is for v3.0 to avoid churning every doc + every existing
+// caller mid-rollout. See BACKLOG.md.
 const tools = [
   {
     name: "cc_sessions",
