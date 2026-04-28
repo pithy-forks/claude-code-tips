@@ -3,194 +3,194 @@
 # claude-code-tips
 
 [![CI](https://github.com/anipotts/claude-code-tips/actions/workflows/validate.yml/badge.svg)](https://github.com/anipotts/claude-code-tips/actions/workflows/validate.yml)
-[![GitHub तारे](https://img.shields.io/github/stars/anipotts/claude-code-tips?style=flat-square&labelColor=111827&color=000)](https://github.com/anipotts/claude-code-tips/stargazers)
+[![GitHub stars](https://img.shields.io/github/stars/anipotts/claude-code-tips?style=flat-square&labelColor=111827&color=000)](https://github.com/anipotts/claude-code-tips/stargazers)
 [![last commit](https://img.shields.io/github/last-commit/anipotts/claude-code-tips?style=flat-square&labelColor=111827&color=000)](https://github.com/anipotts/claude-code-tips/commits/main)
 [![tested with](https://img.shields.io/badge/tested%20with-Claude%20Code%20v2.1.94-000?style=flat-square&labelColor=D4A574&logo=anthropic&logoColor=white)](https://docs.anthropic.com/en/docs/claude-code)
 [![license](https://img.shields.io/github/license/anipotts/claude-code-tips?style=flat-square&labelColor=111827&color=000)](./LICENSE)
 
-Claude Code के पैटर्न, YC startups, public tech companies, और unicorns में battle-tested। किसी ने maintain किया जो Claude Code को अपने काम के रूप में use करता है।
+claude code के पैटर्न, जो YC startups, public tech companies और unicorns में battle-tested हैं। किसी के द्वारा maintain किया जाता है जो claude code को अपनी job के तौर पर use करते हैं।
 
-यहाँ नए हो? [tips index](./docs/tips/) से शुरू करें या [hooks](./docs/hooks.md) और [automation](./docs/automation.md) को skim करें।
+नए हो? [tips index](./docs/tips/) से शुरू करो या [hooks](./docs/hooks.md) और [automation](./docs/automation.md) को skim करो।
 
-## क्या है यहाँ
+## क्या अंदर है
 
 तीन plugins, एक marketplace।
 
-- **`lore@cc`** हर session को sqlite में mine किया जाता है। costs, tools, errors, hotspots, loops को query करें, और अपने पूरे history में full-text search करें। सब कुछ local है।
-- **`cc@cc`** cross-session awareness और messaging। plus एक `time` subsystem: `/cc:time-estimate` realistic Claude Code time देता है जो आपके session history पर आधारित है, optimistic guesses नहीं।
-- **`fuel@cc`** 3-meter fuel gauge (5-hour session, 7-day weekly, 200k context)। pre-turn hook Claude को cleaner handoffs की ओर nudge करता है जब meters भरते हैं। `/fuel state` उन्हें directly पढ़ता है; `/fuel handoff` एक stopping point draft करता है।
+- **`lore@cc`** हर session को sqlite में मined किया जाता है। costs, tools, errors, hotspots, loops और अपने पूरे history के across full-text search को query करो। सब कुछ local है।
+- **`cc@cc`** cross-session awareness और messaging। साथ ही एक `time` subsystem: `/cc:time-estimate` realistic claude-code time देता है जो तुम्हारे session history में grounded होता है, optimistic guesses नहीं।
+- **`fuel@cc`** 3-meter fuel gauge (5-hour session, 7-day weekly, 200k context)। pre-turn hook claude को cleaner handoffs की ओर nudge करता है जबकि meters भरते हैं। `/fuel state` उन्हें directly पढ़ता है; `/fuel handoff` एक stopping point को draft करता है।
 
 ```
 > /cc:time-estimate "rewrite auth middleware and add tests"
 CC: ~22 min active (standard mode, Opus 4.7 high)
-आपका समय: ~15 min review
+your time: ~15 min review
 ```
 
-## quick start
+## जल्दी शुरुआत
 
 ```bash
-/plugin marketplace add anipotts/claude-code-tips   # add marketplace (one time)
+/plugin marketplace add anipotts/claude-code-tips   # add marketplace (एक बार)
 /plugin install lore@cc                             # install lore (session analytics)
 /plugin install cc@cc                               # install cc (cross-session messaging)
 ```
 
-फिर: [safety-guard.sh](./hooks/safety-guard.sh) को copy करें dangerous commands को block करने के लिए। एक [tip](./docs/tips/) पढ़ें। बस।
+फिर: [safety-guard.sh](./hooks/safety-guard.sh) को copy करो खतरनाक commands को block करने के लिए। एक [tip](./docs/tips/) पढ़ो। हो गया।
 
 ---
 
 ## संख्याएं
 
-दर्जनों projects में सैकड़ों sessions। $200/mo max plan।
+दर्जनों projects के across सैकड़ों sessions। $200/mo max plan।
 
-same usage API पर ~$12K की cost होगी caching के साथ, ~$95K बिना। कोई autonomous loops नहीं। कोई cron jobs नहीं। हर session मेरे द्वारा prompt type करने से शुरू होता है। [cost math कैसे काम करता है &rarr;](./docs/cost.md)
+same usage $12K के करीब API पर caching के साथ खर्च होगी, बिना caching के $95K। कोई autonomous loops नहीं। कोई cron jobs नहीं। हर session मेरे द्वारा एक prompt type करके शुरू होता है। [cost math कैसे काम करता है &rarr;](./docs/cost.md)
 
 <img src="./gifs/mine-stats.gif" width="100%" alt="mine stats showing sessions, tokens, costs, and projects" />
 
 ---
 
-## lore plugin install करें
+## lore plugin install करो
 
 ```bash
-/plugin marketplace add anipotts/claude-code-tips   # add marketplace (one time)
+/plugin marketplace add anipotts/claude-code-tips   # add marketplace (एक बार)
 /plugin install lore@cc                             # install lore (session analytics)
 /plugin install cc@cc                               # install cc (cross-session messaging)
 ```
 
-आप **[lore](./plugins/lore/)** प्राप्त करते हैं · session mining को sqlite में। costs, search, error memory, pattern detection। सभी डेटा `~/.claude/lore/lore.db` पर local रहता है।
+तुम्हें **[lore](./plugins/lore/)** मिलता है · session mining to sqlite। costs, search, error memory, pattern detection। सभी data locally `~/.claude/lore/lore.db` में रहता है।
 
 ```
-/lore                     आज के sessions, cost, top tools
-/lore search "websocket"  सभी conversations में full-text search
-/lore mistakes            error patterns जो Claude दोहराता है
-/lore hotspots            sessions में सबसे ज्यादा edited files
-/lore loops               sessions में repeated patterns
+/lore                     today's sessions, cost, top tools
+/lore search "websocket"  full-text search across all conversations
+/lore mistakes            error patterns claude keeps repeating
+/lore hotspots            most-edited files across sessions
+/lore loops               repeated patterns across sessions
 ```
 
-`lore` + `safety-guard` hook के साथ शुरू करें। जैसे जाएँ और भी जोड़ें। **[lore docs &rarr;](./plugins/lore/)**
+`lore` + `safety-guard` hook से शुरू करो। जाओ तो और जोड़ो। **[lore docs &rarr;](./plugins/lore/)**
 
 ---
 
 ## cc plugin
 
-cross-session messaging और `time` subsystem। देखें कि दूसरे Claude Code sessions क्या कर रहे हैं, उनके बीच messages भेजें, और अपने session history के आधार पर realistic time estimates प्राप्त करें।
+cross-session messaging और `time` subsystem। देखो कि अन्य claude code sessions क्या कर रहे हैं, उनके बीच messages भेजो, और realistic time estimates प्राप्त करो जो तुम्हारे अपने session history में grounded हों।
 
 ```bash
 /plugin install cc@cc
 ```
 
 ```
-/cc                             active sessions दिखाएँ
-/cc send merizo "pause"         दूसरे session को message भेजें
-/cc:time-estimate <task>        ranged CC estimate, आपके current model + effort का उपयोग करता है
-/cc:time-calibrate              real throughput (lore.db से) को rule के विरुद्ध diff करें
-/cc:time-benchmark              guided A/B/C आपके model पर effort levels में
+/cc                             show active sessions
+/cc send merizo "pause"         message another session
+/cc:time-estimate <task>        ranged CC estimate, uses your current model + effort
+/cc:time-calibrate              diff real throughput (from lore.db) against the rule
+/cc:time-benchmark              guided A/B/C across effort levels on your model
 ```
 
 ---
 
-## 3 चीजें जिन्होंने मेरे coding को बदल दिया
+## 3 चीजें जिन्होंने बदल दिया कि मैं कैसे code करता हूं
 
 ### hooks
 
-hooks "Claude does what i want" और "Claude does whatever it feels like" के बीच का अंतर हैं। CLAUDE.md guidance देता है। hooks enforcement देते हैं। एक सुझाव है, दूसरा एक दीवार है।
+hooks का अंतर "claude वह करता है जो मैं चाहता हूं" और "claude वह करता है जो उसे चाहता है" के बीच है। CLAUDE.md guidance देता है। hooks enforcement देते हैं। एक suggestion है, दूसरा एक wall है।
 
-इस repo में 9 hooks हैं जिन्हें आप किसी भी project में drop कर सकते हैं। safety-guard force pushes, `rm -rf /`, और `curl | bash` को block करता है। no-squash squash merges को block करता है। context-save compaction से पहले state preserve करता है। जो आपके workflow के लिए fit करते हैं उन्हें चुनें। [hook guide &rarr;](./docs/hooks.md)
+इस repo के पास 9 hooks हैं जो तुम किसी भी project में drop कर सकते हो। safety-guard force pushes, `rm -rf /`, और `curl | bash` को block करता है। no-squash squash merges को block करता है। context-save compaction से पहले state को preserve करता है। वह चुनो जो तुम्हारे workflow में fit हो। [hook guide &rarr;](./docs/hooks.md)
 
 ### agent teams
 
-multiple Claude instances एक ही codebase पर simultaneously काम करते हैं, प्रत्येक अपने स्वयं के git worktree में। coordinator tasks assign करता है, results collect करता है, सर्वश्रेष्ठ approach को merge करता है।
+multiple claude instances एक ही codebase पर simultaneously काम कर रहे हैं, प्रत्येक अपनी अलग git worktree में। coordinator tasks assign करता है, results collect करता है, best approach को merge करता है।
 
-मैं इसका उपयोग parallel research के लिए करता हूँ, risky changes को safely try करने के लिए, और अपने working tree को touch किए बिना approaches को side-by-side compare करने के लिए। [how i use agent teams &rarr;](./docs/agents.md)
+मैं इसे parallel research के लिए, risky changes को safely आजमाने के लिए, और अपनी working tree को touch किए बिना approaches को side-by-side compare करने के लिए use करता हूं। [मैं agent teams कैसे use करता हूं &rarr;](./docs/agents.md)
 
 ### prompt caching
 
-यह कारण है कि $200/mo plan AI coding में सर्वश्रेष्ठ deal है। Claude Code आपके system prompt, tools, और CLAUDE.md को prefix के रूप में cache करता है। मेरे 91% input tokens cache को hit करते हैं, यानी मैं अपने 91% reads पर input cost का 10% pay करता हूँ।
+यही कारण है कि $200/mo plan AI coding में best deal है। claude code तुम्हारे system prompt, tools, और CLAUDE.md को एक prefix के रूप में cache करता है। मेरे 91% input tokens cache hit करते हैं, मतलब मैं 91% reads पर input cost का 10% pay करता हूं।
 
-चाबी: अपना CLAUDE.md short और stable रखें। हर edit prefix cache को break करता है। मेरा 30 lines का है और शायद हफ्ते में एक बार बदलता है। [the full cost breakdown &rarr;](./docs/cost.md)
+key: अपने CLAUDE.md को short और stable रखो। हर edit prefix cache को break करता है। मेरा 30 lines का है और शायद हफ्ते में एक बार change होता है। [पूरा cost breakdown &rarr;](./docs/cost.md)
 
 ---
 
-## सुझाव
+## टिप्स
 
-छोटी, standalone techniques। हर एक कुछ है जो आप अपने अगले session में उपयोग कर सकते हैं।
+short, standalone techniques। हर एक कुछ ऐसा है जो तुम अपने अगले session में use कर सकते हो।
 
-| सुझाव | आप क्या सीखते हैं |
+| tip | तुम क्या सीखते हो |
 |-----|---------------|
-| [prompt caching](./docs/tips/prompt-caching.md) | 97%+ cache hit rates प्राप्त करें, अपने बिल को slash करें |
-| [safety hooks](./docs/tips/safety-hooks.md) | 5 मिनट में force pushes और rm -rf को block करें |
+| [prompt caching](./docs/tips/prompt-caching.md) | 97%+ cache hit rates प्राप्त करो, अपना bill slash करो |
+| [safety hooks](./docs/tips/safety-hooks.md) | 5 minutes में force pushes और rm -rf को block करो |
 | [settings hierarchy](./docs/tips/settings-hierarchy.md) | project vs global vs local settings |
-| [session length](./docs/tips/session-length.md) | क्यों shorter sessions ज्यादा efficient हैं (data के साथ) |
-| [ultrathink](./docs/tips/ultrathink.md) | complex problems के लिए extended thinking force करें |
+| [session length](./docs/tips/session-length.md) | क्यों छोटे sessions ज्यादा efficient हैं (data के साथ) |
+| [ultrathink](./docs/tips/ultrathink.md) | complex problems के लिए extended thinking को force करो |
 | [context management](./docs/tips/context-management.md) | compaction strategies, active tool rate, sessions को tight रखना |
-| [plan mode](./docs/tips/plan-mode.md) | कब planning समय बचाता है vs कब यह waste करता है |
+| [plan mode](./docs/tips/plan-mode.md) | कब planning time बचाता है बनाम कब waste करता है |
 | [fast mode](./docs/tips/fast-mode.md) | same model, faster output, tradeoff |
-| [plugins](./docs/tips/plugins.md) | scratch से plugin build करें, क्या एक को install करने लायक बनाता है |
-| [subagents](./docs/tips/subagents.md) | agent teams, worktree isolation, कब parallel pay off होता है |
-| [mcp integration](./docs/tips/mcp-integration.md) | MCP servers को wire up करें, sessions के अंदर उन्हें use करें |
+| [plugins](./docs/tips/plugins.md) | scratch से एक plugin build करो, कौन सा एक install करने लायक है |
+| [subagents](./docs/tips/subagents.md) | agent teams, worktree isolation, कब parallel pay off करता है |
+| [mcp integration](./docs/tips/mcp-integration.md) | MCP servers को wire करो, उन्हें sessions के अंदर use करो |
 | [hooks v2](./docs/tips/hooks-v2.md) | command vs http vs prompt hooks, async pattern |
 
 ---
 
 ## hooks
 
-एक copy करें, इसे wire up करें, बस। हर एक standalone bash script है। [full guide &rarr;](./docs/hooks.md)
+एक copy करो, wire करो, हो गया। प्रत्येक एक standalone bash script है। [full guide &rarr;](./docs/hooks.md)
 
-| hook | event | यह क्या करता है |
+| hook | event | क्या यह करता है |
 |---|---|---|
 | [safety-guard](./hooks/safety-guard.sh) | PreToolUse | force push, `rm -rf /`, DROP TABLE, curl-pipe-sh को block करता है |
 | [no-squash](./hooks/no-squash.sh) | PreToolUse | squash merges को block करता है |
 | [panopticon](./hooks/panopticon.sh) | PostToolUse | हर tool call को sqlite में log करता है |
-| [context-save](./hooks/context-save.sh) | PreCompact | compression से पहले context save करता है |
-| [notify](./hooks/notify.sh) | Notification | macOS, Slack, ntfy को route करता है |
+| [context-save](./hooks/context-save.sh) | PreCompact | compression से पहले context को save करता है |
+| [notify](./hooks/notify.sh) | Notification | macOS, Slack, ntfy में routes करता है |
 
 <details>
 <summary>4 और hooks</summary>
 
-| hook | event | यह क्या करता है |
+| hook | event | क्या यह करता है |
 |---|---|---|
-| [commit-nudge](./hooks/commit-nudge.sh) | PostToolUse | N edits के बाद commit करने के लिए याद दिलाता है |
-| [version-stamp](./hooks/version-stamp.sh) | SessionEnd | auto-updates "tested with" stamps |
+| [commit-nudge](./hooks/commit-nudge.sh) | PostToolUse | N edits के बाद commit करने की याद दिलाता है |
+| [version-stamp](./hooks/version-stamp.sh) | SessionEnd | "tested with" stamps को auto-update करता है |
 | [stale-branch](./hooks/stale-branch.sh) | SessionStart | gone tracking branches के बारे में warn करता है |
-| [md-lint-fix](./hooks/md-lint-fix.sh) | PostToolUse | save पर auto-fixes markdown lint |
+| [md-lint-fix](./hooks/md-lint-fix.sh) | PostToolUse | save पर markdown lint को auto-fix करता है |
 
 </details>
 
 <img src="./gifs/hook-safety.gif" width="100%" alt="safety-guard blocking a dangerous command" />
 
-## example agents
+## उदाहरण agents
 
-`.claude/agents/` को copy करें और `/agent <name>` के साथ invoke करें। हर एक अलग pattern सिखाता है। [guide &rarr;](./docs/agents.md)
+`.claude/agents/` में copy करो और `/agent <name>` के साथ invoke करो। प्रत्येक एक different pattern सिखाता है। [guide &rarr;](./docs/agents.md)
 
-| agent | pattern | यह क्या करता है |
+| agent | pattern | क्या यह करता है |
 |---|---|---|
 | [watch-tests](./examples/agents/watch-tests.md) | daemon | files को watch करता है, tests चलाता है, fixes propose करता है |
 | [try-worktree](./examples/agents/try-worktree.md) | worktree | isolated worktrees में risky changes try करता है |
 | [arch-review](./examples/agents/arch-review.md) | quick review | fast architecture smell-test |
-| [write-pr](./examples/agents/write-pr.md) | git integration | आपके diff से PR descriptions |
+| [write-pr](./examples/agents/write-pr.md) | git integration | तुम्हारे diff से PR descriptions |
 
-## commands जो मैं use करता हूँ
+## commands जो मैं use करता हूं
 
-| command | यह क्या करता है |
+| command | क्या यह करता है |
 |---|---|
 | `/lore` | usage data · costs, sessions, search, patterns |
-| `/ship` | stage, commit, push, एक command में PR खोलें |
-| `/improve` | git history से CLAUDE.md updates propose करें |
+| `/ship` | stage, commit, push, एक command में PR खोलो |
+| `/improve` | git history से CLAUDE.md updates propose करो |
 
-plus [2 example commands](./examples/commands/) जिन्हें आप copy कर सकते हैं: `/sweep`, `/quicktest`।
+साथ ही [2 example commands](./examples/commands/) जो तुम copy कर सकते हो: `/sweep`, `/quicktest`।
 
 ---
 
-## मेरे personal takes
+## मेरे व्यक्तिगत विचार
 
 | | क्या |
 |---|---|
-| [cost reality](./docs/cost.md) | Claude Code actually cost क्या है, prompt caching math |
-| [mistakes i made](./docs/mistakes.md) | जो मुझे जला ताकि आप इसे skip कर सकें |
+| [cost reality](./docs/cost.md) | claude code actually क्या खर्च करता है, prompt caching math |
+| [mistakes मैंने किए](./docs/mistakes.md) | क्या मुझे जला दिया ताकि तुम skip कर सको |
 | [automation](./docs/automation.md) | 12 CI pipelines जो इस repo को maintain करती हैं |
-| [session workflow](./docs/session-workflow.md) | मैं दिन-प्रतिदिन Claude Code के साथ कैसे काम करता हूँ |
+| [session workflow](./docs/session-workflow.md) | मैं दिन-प्रतिदिन claude code के साथ कैसे काम करता हूं |
 | [worktrees](./docs/worktrees.md) | desktop app के साथ parallel exploration |
 
-## vs alternatives
+## alternatives के मुकाबले
 
 diplomatic, data-driven, कोई FUD नहीं। हर claim एक source cite करता है।
 
@@ -198,11 +198,11 @@ diplomatic, data-driven, कोई FUD नहीं। हर claim एक sourc
 
 ---
 
-## examples
+## उदाहरण
 
 - [CLAUDE.md templates](./examples/claude-md/) · TypeScript, Python, Rust, Next.js के लिए starter configs
-- [example agents](./examples/agents/) · 4 agents, हर एक अलग pattern सिखाता है
-- [example commands](./examples/commands/) · 2 commands जो आप किसी भी project को copy कर सकते हैं
+- [example agents](./examples/agents/) · 4 agents, प्रत्येक एक different pattern सिखाता है
+- [example commands](./examples/commands/) · 2 commands जो तुम किसी भी project में copy कर सकते हो
 - [handoff plugin](./examples/plugins/handoff/) · PreCompact context preservation
 - [broadcast plugin](./examples/plugins/broadcast/) · git events पर async notifications
 
@@ -210,12 +210,12 @@ diplomatic, data-driven, कोई FUD नहीं। हर claim एक sourc
 
 ## यह repo कैसे काम करता है
 
-यह repo अपने स्वयं के patterns पर चलता है।
+यह repo अपने पैटर्न पर चलता है।
 
-- **12 CI workflows** · docs audit, competitive intel, community digest, freshness check, stale cleanup, dependabot, releases, plugin smoke test, PR quality gate, validation, Claude responder, upstream watcher
+- **12 CI workflows** · docs audit, competitive intel, community digest, freshness check, stale cleanup, dependabot, releases, plugin smoke test, PR quality gate, validation, claude responder, upstream watcher
 - **11 hooks** हर session पर चलते हैं
-- **<$1/month** CI cost · AI-powered workflows haiku का उपयोग करते हैं
-- **0 manual maintenance** · सब कुछ जिसके लिए taste की requirement नहीं है automated है
+- **<$1/month** CI cost · AI-powered workflows haiku use करते हैं
+- **0 manual maintenance** · सब कुछ जिसे taste की जरूरत नहीं automated है
 
 [automation details &rarr;](./docs/automation.md)
 
@@ -223,14 +223,14 @@ diplomatic, data-driven, कोई FUD नहीं। हर claim एक sourc
 
 ## tools जो मैंने इन patterns से build किए
 
-ये सभी हर दिन Claude Code में रहने से आए। हर एक एक specific problem को solve करता है जो मैं बार-बार hit करता था।
+ये सब इस बात से आते हैं कि हर दिन claude code में रहना। प्रत्येक एक specific problem को solve करता है जिससे मैं बार-बार hit होता था।
 
-- **[lore](./plugins/lore/)** · session mining को sqlite में। costs, search, error memory, pattern detection
-- **[claudemon](https://github.com/anipotts/claudemon)** · real-time session monitoring projects और machines में
-- **[cc](./plugins/cc/)** · multi-session awareness। देखें कि दूसरे sessions क्या कर रहे हैं, उनके बीच messages भेजें
-- **[imessage-mcp](https://github.com/anipotts/imessage-mcp)** · iMessage history के लिए MCP server। 26 tools, zero network requests
+- **[lore](./plugins/lore/)** · session mining to sqlite। costs, search, error memory, pattern detection
+- **[claudemon](https://github.com/anipotts/claudemon)** · real-time session monitoring projects और machines के across
+- **[cc](./plugins/cc/)** · multi-session awareness। देखो कि अन्य sessions क्या कर रहे हैं, उनके बीच messages भेजो
+- **[imessage-mcp](https://github.com/anipotts/imessage-mcp)** · MCP server read-only iMessage history के लिए। 26 tools, zero network requests
 
-## मुझसे और
+## मेरे से और
 
 - [anipotts.com/thoughts](https://anipotts.com/thoughts) · long-form
 - [buttondown.com/anipotts](https://buttondown.com/anipotts) · newsletter
@@ -238,6 +238,6 @@ diplomatic, data-driven, कोई FUD नहीं। हर claim एक sourc
 
 ---
 
-MIT &middot; built by [anipotts](https://anipotts.com)
+MIT · built by [anipotts](https://anipotts.com)
 
-<!-- translated from README.md @ 925abe7 -->
+<!-- translated from README.md @ 62df0ee -->
