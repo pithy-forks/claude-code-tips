@@ -1,4 +1,4 @@
-<!-- tested with: claude code v2.1.118 -->
+<!-- tested with: claude code v2.1.122 -->
 
 # cc
 
@@ -6,9 +6,6 @@ session mesh for claude code. like email cc: every session on your machine
 stays informed of what its siblings are doing, and you see what they're doing,
 so two agents never silently clobber the same file. zero-token when quiet,
 200-400 tokens of real cross-session awareness when active.
-
-also ships the `time` subsystem (a rule, a hook, three `/time-*` skills) from
-the v1 plugin, unchanged.
 
 ## install
 
@@ -23,12 +20,21 @@ zero configuration. works on macos, linux, wsl.
 
 ## quickstart
 
+cc is **one tool with four actions**. invoke via the `cc` MCP tool directly,
+or trigger the `sessions` skill via `/cc:sessions` or natural language.
+
 ```
-/cc:sessions                                 list other sessions on this machine
-/cc:sessions send <name> "hello"             direct message; recipient sees it on next turn
-/cc:sessions announce "refactoring auth"     broadcast a status update; peers see it in their digest
-/cc:sessions subscribe #auth                 join a topic
-/cc:sessions send --topic=#auth "..."        broadcast to topic subscribers
+# list peers
+cc({ action: "sessions" })
+
+# DM a peer (asking a question)
+cc({ action: "send", to: "abcd1234", message: "30d vs 90d refresh?", urgency: "question" })
+
+# broadcast status to all peers
+cc({ action: "announce", summary: "refactoring auth.ts on feat/oauth" })
+
+# pull awareness digest
+cc({ action: "check" })
 ```
 
 ## how awareness works (the gmail-cc metaphor)
@@ -37,44 +43,40 @@ cc is the email cc line for claude code sessions. you're *informed*, not
 *obligated*. when another session does something relevant, you see it in
 context when you start your next turn. you decide whether to act.
 
-every turn fires `UserPromptSubmit`. cc's hook calls the mcp server there,
-which returns an awareness digest: direct messages, topic activity, peers'
-recent file activity, and file-overlap alerts. only new items since your
-last check are surfaced (delta semantics). empty digests are skipped.
+when you call `cc(action='check')`, cc returns an awareness digest: direct
+messages, peers' recent file activity, and file-overlap alerts. only new
+items since your last check are surfaced (delta semantics). empty digests
+return "(no new cc activity)".
 
 the digest looks like:
 
 ```
-cc digest (3 other sessions active)
+cc digest (2 other sessions active)
 
 direct:
-- merizo (4m, question) "30d vs 90d refresh?": auth refactor, legal wants shorter window...
-
-topic #auth (2 new):
-- quantercise (3m) "merged 30-day branch"
+- abcd1234 (4m, question) "30d vs 90d refresh?": auth refactor, legal wants shorter window...
 
 activity:
-- merizo @ ~/repo-a (src/auth.ts, src/tokens.ts): refactoring session storage [7m]
-- quantercise @ ~/repo-b (lib/deploy/staging.ts): investigating failed CF deploy [12m]
+- abcd1234 @ ~/repo-a (src/auth.ts, src/tokens.ts): refactoring session storage [7m]
+- ef567890 @ ~/repo-b (lib/deploy/staging.ts): investigating failed CF deploy [12m]
 
 file overlap:
-- src/auth.ts: also touched by merizo within 8m. coordinate via /cc:sessions send merizo
+- src/auth.ts: also touched by abcd1234 within 8m. coordinate via cc(action='send').
 ```
 
 active turn cost: ~200-400 tokens. quiet turn cost: 0 tokens.
 
-## verbs
+## actions
 
-| verb | does |
+cc 3.1 is **one tool, four actions**. dispatched on the `action`
+discriminator; the model never has to choose between cousin tools.
+
+| action | does |
 |---|---|
-| `sessions` | list live sessions (id, name, cwd, role, topics, recent_files, last_seen) |
-| `send` | direct message or topic broadcast. fields: `to`, `topic`, `message`, `subject`, `urgency` (`low`/`normal`/`urgent`/`question`), `meta` |
-| `announce` | voluntary status broadcast. peers see it in their `check` digest. fields: `summary`, `detail`, `topics` |
-| `check` | awareness digest (structured + rendered). delta-semantics by default; `since_s` forces lookback |
-| `subscribe` | join a topic (e.g. `#auth`). optional `role` tags your session |
-| `unsubscribe` | leave a topic |
-| `cleanup` | deregister self (called by `SessionEnd` hook) |
-| `ask` / `answer` | scaffolded; wired in 2.1.0. use `/cc:sessions send` with `urgency: question` for now |
+| `sessions` | list live sessions (`include_self?: boolean`). returns id, short_id, cwd_basename, recent_files, last_seen_s |
+| `send` | direct-message a peer. fields: `to` (short id, full id, or cwd basename), `message`, optional `subject` / `urgency` (`low`/`normal`/`urgent`/`question`) / `meta` |
+| `announce` | broadcast status visible in peers' next digest. fields: `summary`, optional `detail` |
+| `check` | pull awareness digest (peers' recent files, file overlaps, unread DMs). delta-semantic by default; `since_s` forces lookback |
 
 ## file-overlap alerts (the killer feature)
 
@@ -89,20 +91,16 @@ read is filesystem-level and never enters your context.
 
 ## hooks
 
-| event | calls | why |
-|---|---|---|
-| `SessionStart` | `cc check` (mcp_tool) | inject initial digest; register presence |
-| `UserPromptSubmit` | `cc check` (mcp_tool) | primary awareness surface, before each user turn |
-| `SessionEnd` | `cc cleanup` (mcp_tool) | tombstone session, remove inbox |
+cc v3 has **no hooks**. presence registration happens at MCP-connect time;
+heartbeat keeps the row fresh; cleanup runs at process shutdown. The
+SessionStart / UserPromptSubmit / SessionEnd hook trio that v2 used has
+been replaced by:
 
-three hooks, not four. `Stop` is deliberately not used because claude code
-only injects `additionalContext` on six events, and `Stop` is not one.
-messages arriving during an assistant turn surface on the *next* user
-prompt, which matches the email-cc metaphor (you check email when you check
-email, not mid-keystroke).
+- explicit `cc(action='check')` calls (when the model wants the digest)
+- channel push notifications (when `--channels` is on, mid-turn)
 
-all three hooks use `type: "mcp_tool"` from claude code v2.1.118: the hook
-calls the mcp server's `cc` tool directly. no shell shim, no node shim.
+This means cc's per-prompt cost is exactly zero unless the model decides
+the digest is relevant.
 
 ## realtime push (tier 2, opt-in)
 
@@ -125,25 +123,29 @@ change to switch.
 ```
 plugins/cc/
 ├── .claude-plugin/plugin.json
-├── server.ts                       mcp server, 7 verbs + 2 scaffolded
-├── db/
-│   ├── schema.sql                  6 tables: sessions, topics, subs, recent_files, announcements, questions
-│   └── migrate.ts                  opens db, applies schema
+├── server.ts                       mcp server (single 'cc' tool, 4 actions)
 ├── lib/
-│   ├── render.ts                   Digest → additionalContext text
+│   ├── action.ts                   verb surface: zod discriminated union + JSON schema
+│   ├── lifecycle.ts                start/stop coordinator for heartbeat/tail/watcher/db
+│   ├── cache.ts                    TTLCache for byte-stable hot paths
+│   ├── render.ts                   Digest → text
 │   └── transcript-tail.ts          watches own transcript, publishes recent_files
-├── hooks/hooks.json                3 mcp_tool hooks (SessionStart, UserPromptSubmit, SessionEnd)
-└── commands/sessions.md            /cc:sessions slash command
+├── db/
+│   ├── schema.sql                  sessions, recent_files, announcements (+ legacy topics/subs/questions)
+│   └── migrate.ts                  opens db, applies schema, migrates legacy state dir
+├── skills/sessions/SKILL.md        natural-language trigger surface
+└── tests/                          bun test for action / cache / lifecycle
 ```
 
-state at `${CLAUDE_CONFIG_DIR:-~/.claude}/cc/`:
+state at `${CLAUDE_CONFIG_DIR:-~/.claude}/channels/cc/`:
 
 ```
 sessions.db            sqlite metadata (wal mode)
 inbox/<sid>/           direct-message files (atomic rename)
-topics/<t>/            topic-message files (atomic rename)
-questions/             2.1.0, scaffolded
 ```
+
+(legacy `~/.claude/cc/` is migrated automatically on first start; a symlink
+stays at the old path so external tooling pointing there keeps working.)
 
 messages bodies stay on filesystem so directory-based delivery still works
 if sqlite is unavailable. metadata is sqlite so concurrent writes from many
@@ -241,7 +243,28 @@ longer need to `/reload-plugins` after a flaky first start. Look for
 something looks off.
 
 **Eager load.** cc declares `alwaysLoad: true` in its `.mcp.json`, so
-its 5-tool surface and cross-session digest are available the moment
-the session starts rather than being deferred behind tool-search. cc is
-foundational infra (every session sends/receives messages) so the ~2KB
-of tool schemas in startup is the right tradeoff.
+its single tool surface is available the moment the session starts
+rather than being deferred behind tool-search. cc is foundational infra
+(every session sends/receives messages) so the ~2KB of tool schema at
+startup is the right tradeoff.
+
+**Prompt-cache stability.** cc 3.1 collapsed five tools into one with a
+discriminated-union schema. The single tool surface is byte-stable
+across every session that uses cc, so Anthropic's 5-min prompt cache
+hits across consecutive turns. The in-process TTL cache (200ms) on
+`liveSessions` and `recentFilesFor` further guarantees byte-identical
+output when the same call fires twice within an agent turn.
+
+## quality
+
+- 35 unit tests in `tests/` covering schema, cache, lifecycle. run with
+  `bun test tests/` from `plugins/cc/`.
+- `bun smoke` end-to-end checks the MCP protocol round-trip (initialize
+  through tools/list and tools/call).
+- TypeScript strict mode; the dispatcher's switch is exhaustiveness-
+  checked at compile time so adding a verb without wiring it up fails
+  the build.
+- Every `cc(action='send')` and `cc(action='announce')` payload runs
+  through the exfil guard before hitting disk; refusing paths under
+  `~/.claude/channels/cc/` blocks prompt-injection attempts to leak
+  channel state.
