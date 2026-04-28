@@ -1,12 +1,19 @@
 # changelog
 
+## 2026-04-28c
+
+### docs: correct install syntax to use `@anipotts` (github owner) not `@claude-code-tips`
+- **the actual fact**: when a marketplace is added via `/plugin marketplace add anipotts/claude-code-tips`, Claude Code registers it locally under the github **owner** (`anipotts`), not the `name` field in marketplace.json. So the canonical install syntax is `<plugin>@anipotts`. The `name` field in marketplace.json is display metadata only.
+- the 2026-04-28b entry below documented `<plugin>@claude-code-tips` as the install syntax. That was wrong and broke installs for anyone who tried it. Corrected across README (en + 5 translated), plugin READMEs, docs/tips/plugins.md, root plugin.json description, CLAUDE.md / AGENTS.md inline phrase.
+- canonical: `/plugin marketplace add anipotts/claude-code-tips` then `/plugin install cc@anipotts`, `/plugin install lore@anipotts`, `/plugin install time@anipotts`.
+- if you tried the broken syntax: `/plugin marketplace remove anipotts` then `rm -rf ~/.claude/plugins/marketplaces/anipotts` (clean stale cache) then re-add and install with `@anipotts`.
+
 ## 2026-04-28b
 
 ### marketplace rename: `cc` -> `claude-code-tips`
 - single-source-of-truth: there were three separate things named `cc` (marketplace internal name, plugin name, and a stale standalone github repo `anipotts/cc`). marketplace internal name renamed to `claude-code-tips` to remove that overload. plugin names unchanged (cc, lore, time still install the same way).
-- install commands: `cc@cc` -> `cc@claude-code-tips`, `lore@cc` -> `lore@claude-code-tips`, `time@cc` -> `time@claude-code-tips`. github clone path `anipotts/claude-code-tips` is unchanged.
-- BREAKING for users with the marketplace already added: run `/plugin marketplace remove cc` then `/plugin marketplace add anipotts/claude-code-tips` to pick up the new internal name. then re-install plugins with the new `<plugin>@claude-code-tips` syntax.
 - the standalone `anipotts/cc` github repo is being archived; do not use it. the canonical and only source is `anipotts/claude-code-tips`.
+- (note: see 2026-04-28c above; this entry originally included incorrect install-syntax instructions that have since been corrected.)
 
 ## 2026-04-28
 

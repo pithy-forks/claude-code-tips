@@ -19,7 +19,7 @@ re-measure your personal throughput and produce a diff report against the generi
 2. **if absent**, explain and stop:
    - the calibration needs session history in `~/.claude/lore.db`.
    - that database is built by the `lore` plugin from `~/.claude/projects/`.
-   - install via `/plugin install lore@claude-code-tips`, run `/lore:graph`, then re-run `/time-calibrate`.
+   - install via `/plugin install lore@anipotts`, run `/lore:graph`, then re-run `/time-calibrate`.
    - do not fail loudly. one-screen message, no stack traces.
 
 3. **if present**, resolve active effort (same precedence as `/time-estimate`) and current model, then run the calibration SQL via `Bash` + `sqlite3 -readonly`.
