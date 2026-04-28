@@ -90,7 +90,7 @@ in cross-machine mode.
 
 The schema retains topics/subscriptions tables; the user surface is
 currently DM-only. Future opt-in topic UX should solve the discovery
-+ auto-subscription problems that killed v1 topics:
+and auto-subscription problems that killed v1 topics:
 
 1. **Auto-derived topics:** every session in `~/Code/active/<proj>`
    auto-subscribes to `#<proj>`. No user typing.
@@ -158,13 +158,12 @@ DB-verified. Will die naturally on user's next CC restart.
 
 ---
 
-# CC 2.1.121 changelog adoption — items deferred from PR
+**CC 2.1.121 changelog adoption — items deferred from PR.** The PR
+shipping `alwaysLoad`, the README cascade docs, and the MCP auto-retry
+note also surfaced these. Captured here so a future session can pick
+them up with full rationale.
 
-The PR shipping `alwaysLoad`, the README cascade docs, and the MCP
-auto-retry note also surfaced these. Captured here so a future
-session can pick them up with full rationale.
-
-## monitors manifest — needs investigation (deferred from PR)
+## [CC 2.1.121] monitors manifest — needs investigation
 
 CC 2.1.121 added a `monitors` array to plugin manifests. The initial
 plan was to extract cc's inbox watcher (currently `fs.watch(myInbox,
@@ -194,7 +193,7 @@ What to verify before refactoring:
 Until verified, the `fs.watch` lives in server.ts and Tier 2 push
 keeps working.
 
-## PreCompact hook to protect cc-active sessions (CC 2.1.105)
+## [CC 2.1.105] PreCompact hook to protect cc-active sessions
 
 CC 2.1.105 introduced a `PreCompact` hook that fires before automatic
 compaction. cc could register one that decides whether to skip
@@ -210,7 +209,7 @@ Considerations:
 - Wire through cc.check with an `is_blocking_present` boolean, then
   the PreCompact hook just queries that.
 
-## ${CLAUDE_EFFORT} for digest verbosity (CC 2.1.120)
+## [CC 2.1.120] ${CLAUDE_EFFORT} for digest verbosity
 
 CC 2.1.120 exposes `${CLAUDE_EFFORT}` (low/medium/high) as a hook env
 var. cc.check could vary digest verbosity by effort: at low, only
@@ -218,7 +217,7 @@ direct messages; at medium, current digest; at high, include peer
 file-recency tail and the file-overlap matrix. Saves tokens on
 short-burst sessions where the user just wants a fast yes/no.
 
-## Include cc state dirs in cleanupPeriodDays (CC 2.1.117)
+## [CC 2.1.117] Include cc state dirs in cleanupPeriodDays
 
 CC 2.1.117 added a `cleanupPeriodDays` setting that retention-sweeps
 plugin data dirs. cc currently keeps inbox/topics/questions
@@ -231,7 +230,7 @@ older than the configured window from `inbox/<sid>/` and
 `topics/<topic>/`. Sessions table rows already have an `ended_at`
 column; sweep ended sessions whose `ended_at` exceeds the window.
 
-## Use duration_ms from PostToolUse for recent_files weighting (CC 2.1.119)
+## [CC 2.1.119] Use duration_ms from PostToolUse for recent_files weighting
 
 CC 2.1.119 enriches PostToolUse hook payloads with `duration_ms`. cc's
 file-recency surface today treats every Edit/Write as a flat point.
@@ -244,7 +243,7 @@ Wire-up: PostToolUse hook captures (tool, file, duration_ms),
 inserts into a `tool_calls` table, the digest renderer reads weighted
 recency.
 
-## Skill description token cap raised 250→1536 (CC 2.1.97)
+## [CC 2.1.97] Skill description token cap raised 250 to 1536
 
 If we ever convert any `/cc:*` commands to skills (currently they're
 slash commands that call MCP tools), the higher description token
@@ -252,7 +251,7 @@ cap means we can ship richer auto-trigger guidance without truncation.
 No action today; relevant only if the commands→skills migration
 happens.
 
-## Push notifications via Notifications tool (CC 2.1.110)
+## [CC 2.1.110] Push notifications via Notifications tool
 
 CC 2.1.110 added system-level push notifications via the
 `Notifications` tool. cc could surface urgent peer DMs (urgency =
