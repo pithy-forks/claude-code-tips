@@ -36,6 +36,7 @@ import {
   type ActionName,
 } from "./lib/action.js";
 import { Lifecycle } from "./lib/lifecycle.js";
+import { TTLCache } from "./lib/cache.js";
 
 // --- single source of truth for the server version ---
 // Bun reads package.json at compile time when the server is built with
@@ -445,32 +446,43 @@ function resolveSessionTarget(target: string): ResolvedTarget | "ambiguous" | nu
   return "ambiguous";
 }
 
-function liveSessions(): Array<{
+type LiveSessionRow = {
   id: string;
   name: string;
   cwd: string;
   role: string | null;
   last_seen_at_ms: number;
   started_at_ms: number;
-}> {
-  return db
-    .prepare(
-      `SELECT id, name, cwd, role, last_seen_at_ms, started_at_ms
-       FROM sessions
-       WHERE ended_at_ms IS NULL AND last_seen_at_ms > ?
-       ORDER BY last_seen_at_ms DESC`,
-    )
-    .all(now() - STALE_SESSION_AFTER_MS) as Array<{
-    id: string;
-    name: string;
-    cwd: string;
-    role: string | null;
-    last_seen_at_ms: number;
-    started_at_ms: number;
-  }>;
+};
+
+// 200ms TTL: peer state genuinely changes (heartbeats land every 30s, ended_at
+// flips on shutdown), but within a single user turn the answer is stable. The
+// tight window means cross-turn freshness is preserved.
+const liveSessionsCache = new TTLCache<"all", LiveSessionRow[]>(200);
+
+function liveSessions(): LiveSessionRow[] {
+  return liveSessionsCache.get("all", () =>
+    db
+      .prepare(
+        `SELECT id, name, cwd, role, last_seen_at_ms, started_at_ms
+         FROM sessions
+         WHERE ended_at_ms IS NULL AND last_seen_at_ms > ?
+         ORDER BY last_seen_at_ms DESC`,
+      )
+      .all(now() - STALE_SESSION_AFTER_MS) as LiveSessionRow[],
+  );
 }
 
+// Same 200ms TTL as liveSessions: file-recency changes only on PostToolUse
+// from other sessions, which lands in SQLite asynchronously. Within a turn
+// the per-peer file list is stable.
+const recentFilesCache = new TTLCache<string, string[]>(200);
+
 function recentFilesFor(sid: string, limit = 5): string[] {
+  return recentFilesCache.get(`${sid}:${limit}`, () => recentFilesForUncached(sid, limit));
+}
+
+function recentFilesForUncached(sid: string, limit = 5): string[] {
   return (
     db
       .prepare(
