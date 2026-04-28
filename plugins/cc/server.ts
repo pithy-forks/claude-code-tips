@@ -28,7 +28,7 @@ import * as path from "node:path";
 import * as os from "node:os";
 import { randomBytes } from "node:crypto";
 
-import { openDb } from "./db/migrate.js";
+import { openDb, migrateLegacyStateDir } from "./db/migrate.js";
 import { startTranscriptTail } from "./lib/transcript-tail.js";
 import { renderDigest, type Digest } from "./lib/render.js";
 
@@ -36,7 +36,15 @@ import { renderDigest, type Digest } from "./lib/render.js";
 
 const CLAUDE_DIR =
   process.env.CLAUDE_CONFIG_DIR || path.join(os.homedir(), ".claude");
-const CC_DIR = path.join(CLAUDE_DIR, "cc");
+// v3: state lives under channels/<plugin> to align with the imessage plugin's
+// ~/.claude/channels/imessage/ convention. CC_STATE_DIR overrides for tests.
+// The legacy ~/.claude/cc/ path migrates automatically on first start (see
+// db/migrate.ts:migrateLegacyStateDir) -- a symlink stays at the old path so
+// any external tooling pointing there keeps working.
+const LEGACY_CC_DIR = path.join(CLAUDE_DIR, "cc");
+const CC_DIR =
+  process.env.CC_STATE_DIR || path.join(CLAUDE_DIR, "channels", "cc");
+migrateLegacyStateDir(LEGACY_CC_DIR, CC_DIR);
 const SESSIONS_DIR = path.join(CLAUDE_DIR, "sessions");
 const INBOX_DIR = path.join(CC_DIR, "inbox");
 const TOPICS_DIR = path.join(CC_DIR, "topics");

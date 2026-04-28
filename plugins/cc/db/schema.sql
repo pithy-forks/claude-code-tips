@@ -1,4 +1,17 @@
--- cc v2 metadata schema. Metadata only; message bodies stay on filesystem.
+-- cc v3 metadata schema. Metadata only; message bodies stay on filesystem.
+--
+-- v3 changes from v2:
+--   sessions: + project_root, branch, worktree_root (for branch/worktree-aware
+--             file-overlap detection -- see commit 6 in PR #56)
+--   recent_files: + branch, worktree_root captured at touch time so a peer's
+--                 conflict alert can match (path, branch) OR (path, worktree)
+--                 without re-resolving the peer's current branch
+--   The 'topics', 'subscriptions', and 'announcements.topics' columns are
+--   retained even though commit 5 drops them from the user surface -- the
+--   schema is cheap, and a future opt-in topic UX won't need a migration.
+--
+-- Schema is idempotent (CREATE ... IF NOT EXISTS, ALTER ... ADD COLUMN guarded
+-- by introspection in db/migrate.ts).
 
 PRAGMA journal_mode = WAL;
 PRAGMA synchronous = NORMAL;
@@ -8,6 +21,9 @@ CREATE TABLE IF NOT EXISTS sessions (
   id TEXT PRIMARY KEY,
   name TEXT,
   cwd TEXT,
+  project_root TEXT,
+  branch TEXT,
+  worktree_root TEXT,
   role TEXT,
   pid INTEGER,
   started_at_ms INTEGER NOT NULL,
@@ -17,6 +33,8 @@ CREATE TABLE IF NOT EXISTS sessions (
 );
 CREATE INDEX IF NOT EXISTS idx_sessions_last_seen ON sessions(last_seen_at_ms);
 CREATE INDEX IF NOT EXISTS idx_sessions_ended ON sessions(ended_at_ms);
+CREATE INDEX IF NOT EXISTS idx_sessions_project ON sessions(project_root, ended_at_ms);
+CREATE INDEX IF NOT EXISTS idx_sessions_branch ON sessions(branch, ended_at_ms);
 
 CREATE TABLE IF NOT EXISTS topics (
   name TEXT PRIMARY KEY,
@@ -34,11 +52,15 @@ CREATE INDEX IF NOT EXISTS idx_subs_topic ON subscriptions(topic);
 CREATE TABLE IF NOT EXISTS recent_files (
   session_id TEXT NOT NULL,
   path TEXT NOT NULL,
+  branch TEXT,
+  worktree_root TEXT,
   touched_at_ms INTEGER NOT NULL,
   PRIMARY KEY (session_id, path)
 );
 CREATE INDEX IF NOT EXISTS idx_recent_files_touched ON recent_files(touched_at_ms);
 CREATE INDEX IF NOT EXISTS idx_recent_files_path ON recent_files(path);
+CREATE INDEX IF NOT EXISTS idx_recent_files_branch ON recent_files(path, branch);
+CREATE INDEX IF NOT EXISTS idx_recent_files_worktree ON recent_files(path, worktree_root);
 
 CREATE TABLE IF NOT EXISTS announcements (
   id TEXT PRIMARY KEY,
