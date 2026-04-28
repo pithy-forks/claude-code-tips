@@ -108,43 +108,19 @@ for (const d of [CC_DIR, INBOX_DIR, TOPICS_DIR, QUESTIONS_DIR]) {
 
 const db = openDb(DB_PATH);
 
-// --- name resolution ---
+// --- identity ---
+// v3: name auto-population dropped. Sessions identify by short session id +
+// cwd basename. The 'name' column on sessions is retained nullable so a
+// future rename verb can write to it without a migration. Today nothing
+// reads it.
+//
+// FUTURE: rename hook. To re-enable user-set names later, add a 'rename'
+// verb that updates sessions.name; resolveSessionTarget below already tries
+// name first via the existing column, so renames would Just Work without
+// further plumbing.
 
-type NativeSession = {
-  pid: number;
-  sessionId: string;
-  cwd: string;
-  name?: string;
-  kind?: string;
-  startedAt?: number;
-};
-
-function readNativeSession(sid: string): NativeSession | null {
-  try {
-    for (const f of fs.readdirSync(SESSIONS_DIR)) {
-      if (!/^\d+\.json$/.test(f)) continue;
-      try {
-        const raw = fs.readFileSync(path.join(SESSIONS_DIR, f), "utf-8");
-        const parsed = JSON.parse(raw);
-        if (parsed?.sessionId === sid) return parsed as NativeSession;
-      } catch {
-        // skip malformed
-      }
-    }
-  } catch {
-    // SESSIONS_DIR missing
-  }
-  return null;
-}
-
-function resolveMyName(): string {
-  const native = readNativeSession(MY_SESSION_ID);
-  if (native?.name) return native.name;
-  if (native?.kind) return native.kind;
-  return path.basename(MY_CWD) || MY_SESSION_ID.slice(0, 8);
-}
-
-const MY_NAME = MY_SESSION_ID ? resolveMyName() : "";
+const MY_SHORT_ID = MY_SESSION_ID ? MY_SESSION_ID.slice(0, 8) : "";
+const MY_CWD_BASENAME = path.basename(MY_CWD) || MY_SHORT_ID;
 
 // --- self-register ---
 
@@ -152,15 +128,14 @@ const now = () => Date.now();
 
 if (MY_SESSION_ID) {
   db.prepare(
-    `INSERT INTO sessions (id, name, cwd, pid, started_at_ms, last_seen_at_ms, ended_at_ms)
-     VALUES (?, ?, ?, ?, ?, ?, NULL)
+    `INSERT INTO sessions (id, cwd, pid, started_at_ms, last_seen_at_ms, ended_at_ms)
+     VALUES (?, ?, ?, ?, ?, NULL)
      ON CONFLICT(id) DO UPDATE SET
-       name = excluded.name,
        cwd = excluded.cwd,
        pid = excluded.pid,
        last_seen_at_ms = excluded.last_seen_at_ms,
        ended_at_ms = NULL`,
-  ).run(MY_SESSION_ID, MY_NAME, MY_CWD, MY_PID, now(), now());
+  ).run(MY_SESSION_ID, MY_CWD, MY_PID, now(), now());
 
   fs.mkdirSync(path.join(INBOX_DIR, MY_SESSION_ID), { recursive: true });
 }
@@ -195,31 +170,59 @@ function isLiveSession(row: { last_seen_at_ms: number; ended_at_ms: number | nul
   return now() - row.last_seen_at_ms <= STALE_SESSION_AFTER_MS;
 }
 
-function resolveSessionByName(nameOrId: string): { id: string; name: string; cwd: string } | null {
-  const byId = db
-    .prepare(`SELECT id, name, cwd, last_seen_at_ms, ended_at_ms FROM sessions WHERE id = ?`)
-    .get(nameOrId) as
-    | { id: string; name: string; cwd: string; last_seen_at_ms: number; ended_at_ms: number | null }
-    | undefined;
-  if (byId && isLiveSession(byId)) return { id: byId.id, name: byId.name, cwd: byId.cwd };
+type ResolvedTarget = { id: string; cwd: string };
 
-  const rows = db
+/**
+ * Resolve a `to` argument to one live session. Match strategy:
+ *   1. Full session UUID match.
+ *   2. Short id (first 8 chars) prefix match.
+ *   3. cwd basename match.
+ *   4. (Future) name match -- the column exists but isn't auto-populated;
+ *      a future rename verb writes to it and the user-facing args.to would
+ *      hit this path.
+ *
+ * Throws on ambiguity (multiple live sessions matching steps 2/3) so the
+ * caller can prompt the user to disambiguate with a longer id. Returns null
+ * if nothing matches.
+ */
+function resolveSessionTarget(target: string): ResolvedTarget | "ambiguous" | null {
+  // 1. Full id
+  const byId = db
     .prepare(
-      `SELECT id, name, cwd, last_seen_at_ms, ended_at_ms FROM sessions
-       WHERE name = ? AND ended_at_ms IS NULL
-       ORDER BY last_seen_at_ms DESC`,
+      `SELECT id, cwd, last_seen_at_ms, ended_at_ms FROM sessions WHERE id = ?`,
     )
-    .all(nameOrId) as Array<{
-    id: string;
-    name: string;
-    cwd: string;
-    last_seen_at_ms: number;
-    ended_at_ms: number | null;
-  }>;
-  for (const r of rows) {
-    if (isLiveSession(r)) return { id: r.id, name: r.name, cwd: r.cwd };
+    .get(target) as
+    | { id: string; cwd: string; last_seen_at_ms: number; ended_at_ms: number | null }
+    | undefined;
+  if (byId && isLiveSession(byId)) return { id: byId.id, cwd: byId.cwd };
+
+  // 2 + 3. short-id prefix or cwd basename. Single query, then narrow in JS.
+  const candidates = (
+    db
+      .prepare(
+        `SELECT id, cwd, name, last_seen_at_ms, ended_at_ms FROM sessions
+         WHERE ended_at_ms IS NULL AND last_seen_at_ms > ?`,
+      )
+      .all(now() - STALE_SESSION_AFTER_MS) as Array<{
+      id: string;
+      cwd: string;
+      name: string | null;
+      last_seen_at_ms: number;
+      ended_at_ms: number | null;
+    }>
+  ).filter(isLiveSession);
+
+  const matches: ResolvedTarget[] = [];
+  for (const c of candidates) {
+    const shortId = c.id.slice(0, 8);
+    const base = path.basename(c.cwd);
+    if (shortId === target || base === target || c.name === target) {
+      matches.push({ id: c.id, cwd: c.cwd });
+    }
   }
-  return null;
+  if (matches.length === 0) return null;
+  if (matches.length === 1) return matches[0];
+  return "ambiguous";
 }
 
 function liveSessions(): Array<{
@@ -272,6 +275,8 @@ function lastAnnounceFor(sid: string): { summary: string; age_s: number } | null
   return { summary: row.summary, age_s };
 }
 
+// Topics dropped from the v3 user surface; subscriptionsFor is retained for
+// any future opt-in topic UX. Today nothing reads it.
 function subscriptionsFor(sid: string): string[] {
   return (
     db
@@ -327,8 +332,10 @@ function buildMsgFile(args: {
   urgency: "low" | "normal" | "urgent" | "question";
   meta?: Record<string, unknown>;
 }): string {
+  // 'From' is human-readable: short id + cwd basename. The recipient resolves
+  // the canonical session via 'From-Sid' which is the full UUID.
   const lines = [
-    `From: ${MY_NAME}`,
+    `From: ${MY_SHORT_ID} @ ${MY_CWD_BASENAME}`,
     `From-Sid: ${MY_SESSION_ID}`,
     `Urgency: ${args.urgency}`,
     `Timestamp: ${now()}`,
@@ -425,47 +432,19 @@ function computeDigest(opts: { since_ms?: number | null }): Digest {
   }
   directUnread.sort((a, b) => b.created_at_ms - a.created_at_ms);
 
-  // topic_unread: for each topic this session is subscribed to, read new files in topics/<t>/
-  const myTopics = MY_SESSION_ID ? subscriptionsFor(MY_SESSION_ID) : [];
+  // v3: topic_unread is intentionally always empty. The schema retains
+  // topics/subscriptions for a future opt-in topic UX, but the current digest
+  // surface is DM-only (direct_unread + session_digests + file_overlap_alerts).
   const topicUnread: Record<
     string,
     Array<{ from: string; subject: string; preview: string; age_s: number }>
   > = {};
-  for (const t of myTopics) {
-    const dir = path.join(TOPICS_DIR, t);
-    try {
-      const entries = fs
-        .readdirSync(dir)
-        .filter((f) => f.endsWith(".msg") && !f.startsWith("."));
-      const items: Array<{ from: string; subject: string; preview: string; age_s: number }> = [];
-      for (const f of entries) {
-        try {
-          const content = fs.readFileSync(path.join(dir, f), "utf-8");
-          const m = parseMsgFile(content);
-          if (m.fromSid === MY_SESSION_ID) continue;
-          if (sinceMs !== null && m.created_at_ms <= sinceMs) continue;
-          items.push({
-            from: m.from,
-            subject: m.subject,
-            preview: m.body.slice(0, 200),
-            age_s: Math.max(0, Math.floor((now() - m.created_at_ms) / 1000)),
-          });
-        } catch {
-          // skip
-        }
-      }
-      if (items.length > 0) {
-        items.sort((a, b) => a.age_s - b.age_s);
-        topicUnread[t] = items;
-      }
-    } catch {
-      // topic dir missing
-    }
-  }
 
-  // session_digests: one per live peer
+  // session_digests: one per live peer. v3 identity = "<short-id> @ <cwd-basename>"
+  // ('name' column is retained but no longer auto-populated; if a future
+  // rename verb writes to it, prefer the user-set name when present.)
   const sessionDigests = peers.map((p) => ({
-    session: p.name || p.id.slice(0, 8),
+    session: p.name || `${p.id.slice(0, 8)} @ ${path.basename(p.cwd)}`,
     cwd: p.cwd,
     role: p.role,
     recent_files: recentFilesFor(p.id),
@@ -540,38 +519,19 @@ const tool = {
     properties: {
       action: {
         type: "string",
-        enum: [
-          "sessions",
-          "send",
-          "announce",
-          "check",
-          "subscribe",
-          "unsubscribe",
-          "cleanup",
-          "ask",
-          "answer",
-        ],
+        enum: ["sessions", "send", "announce", "check", "cleanup"],
         description:
-          "sessions: list live; send: message a session or topic; announce: broadcast status; check: awareness digest; subscribe/unsubscribe: topics; cleanup: SessionEnd hook; ask/answer: 2.1.0 (not yet wired).",
+          "sessions: list live peers; send: DM a peer (resolve by short id, full id, or cwd basename); announce: broadcast status to peers; check: pull awareness digest; cleanup: terminate this session's row (called automatically on shutdown -- safe to omit).",
       },
-      include_self: { type: "boolean" },
-      to: { type: "string" },
-      topic: { type: "string" },
-      message: { type: "string" },
-      subject: { type: "string" },
-      urgency: { type: "string", enum: ["low", "normal", "urgent", "question"] },
-      meta: { type: "object" },
-      summary: { type: "string" },
-      detail: { type: "string" },
-      topics: { type: "array", items: { type: "string" } },
-      since_s: { type: "number" },
-      role: { type: "string" },
-      question: { type: "string" },
-      options: { type: "array", items: { type: "string" } },
-      context: { type: "string" },
-      blocking: { type: "boolean" },
-      question_id: { type: "string" },
-      answer: { type: "string" },
+      include_self: { type: "boolean", description: "sessions: include this session in the list" },
+      to: { type: "string", description: "send: target peer (short id, full session id, or cwd basename)" },
+      message: { type: "string", description: "send: body" },
+      subject: { type: "string", description: "send: optional one-line subject" },
+      urgency: { type: "string", enum: ["low", "normal", "urgent", "question"], description: "send: priority hint, default normal" },
+      meta: { type: "object", description: "send: optional structured metadata" },
+      summary: { type: "string", description: "announce: one-line status" },
+      detail: { type: "string", description: "announce: optional longer body" },
+      since_s: { type: "number", description: "check: lookback window in seconds, default = since last check" },
     },
     required: ["action"],
   },
@@ -621,29 +581,26 @@ const ArgsByAction = {
   sessions: z.object({ include_self: z.boolean().optional() }).strict(),
   send: z
     .object({
-      to: z.string().optional(),
-      topic: z.string().optional(), // accepted but ignored in v3 (commit 5)
+      to: z.string().min(1, "'to' is required (session id, short id, or cwd basename)"),
       message: z.string().min(1, "'message' is required"),
       subject: z.string().optional(),
       urgency: urgencySchema.optional(),
       meta: z.record(z.unknown()).optional(),
     })
-    .strict()
-    .refine((v) => v.to || v.topic, {
-      message: "provide 'to' (session name) or 'topic'",
-    }),
+    .strict(),
   announce: z
     .object({
       summary: z.string().min(1, "'summary' is required"),
       detail: z.string().optional(),
-      topics: z.array(z.string()).optional(),
     })
     .strict(),
   check: z.object({ since_s: z.number().positive().optional() }).strict(),
-  subscribe: z
-    .object({ topic: z.string().min(1), role: z.string().optional() })
-    .strict(),
-  unsubscribe: z.object({ topic: z.string().min(1) }).strict(),
+  // Topic verbs are retained in the dispatch table so we can return a
+  // helpful "dropped in v3" error rather than 'unknown action'. The
+  // passthrough schema accepts any args for the same reason -- caller
+  // already typed something; we want them to read the prose.
+  subscribe: z.object({}).passthrough(),
+  unsubscribe: z.object({}).passthrough(),
   cleanup: z.object({}).strict(),
   ask: z.object({}).passthrough(), // not wired
   answer: z.object({}).passthrough(), // not wired
@@ -748,10 +705,10 @@ server.setRequestHandler(CallToolRequestSchema, async (req) => {
       .filter((s) => includeSelf || s.id !== MY_SESSION_ID)
       .map((s) => ({
         id: s.id,
-        name: s.name || s.id.slice(0, 8),
+        short_id: s.id.slice(0, 8),
+        cwd_basename: path.basename(s.cwd),
         cwd: s.cwd,
         role: s.role ?? null,
-        topics: subscriptionsFor(s.id),
         recent_files: recentFilesFor(s.id),
         last_seen_s: Math.max(0, Math.floor((now() - s.last_seen_at_ms) / 1000)),
       }));
@@ -759,71 +716,46 @@ server.setRequestHandler(CallToolRequestSchema, async (req) => {
   }
 
   // ---- send ----
+  // v3: DM only. Topic field on input is accepted by the zod schema but
+  // ignored here (kept in schema so older clients don't crash; future
+  // opt-in topic UX will repurpose it).
   if (action === "send") {
     const to = typeof args.to === "string" ? args.to : "";
-    const topic = typeof args.topic === "string" ? args.topic : "";
     const message = typeof args.message === "string" ? args.message : "";
-    if (!message) return text("cc: 'message' is required.");
-    if (!to && !topic) return text("cc: provide 'to' (session name) or 'topic' (e.g. #auth).");
+    if (!to) {
+      return errorText("cc.send: 'to' is required (short id, full id, or cwd basename of a live peer)");
+    }
     const urgency = (args.urgency as "low" | "normal" | "urgent" | "question") || "normal";
     const subject = typeof args.subject === "string" ? args.subject : "";
     const meta = (args.meta ?? undefined) as Record<string, unknown> | undefined;
+    const target = resolveSessionTarget(to);
+    if (target === null) return errorText(`cc.send: no live session matches '${to}'`);
+    if (target === "ambiguous") {
+      return errorText(
+        `cc.send: '${to}' is ambiguous (multiple live sessions match). Pass a longer session id from cc.sessions output.`,
+      );
+    }
     const body = buildMsgFile({ subject, message, urgency, meta });
     const id = newId("m");
     const filename = `${now()}-${MY_SESSION_ID}-${id}.msg`;
-
-    if (to) {
-      const target = resolveSessionByName(to);
-      if (!target) return text(`cc: session '${to}' not found or not live.`);
-      const dir = path.join(INBOX_DIR, target.id);
-      atomicWrite(dir, filename, body);
-      return text(JSON.stringify({ id, delivered_to: [target.id] }));
-    }
-
-    // topic
-    const t = topic.startsWith("#") ? topic : `#${topic}`;
-    db.prepare(
-      `INSERT INTO topics (name, created_at_ms) VALUES (?, ?) ON CONFLICT(name) DO NOTHING`,
-    ).run(t, now());
-    const dir = path.join(TOPICS_DIR, t);
+    const dir = path.join(INBOX_DIR, target.id);
     atomicWrite(dir, filename, body);
-    const subs = (
-      db.prepare(`SELECT session_id FROM subscriptions WHERE topic = ?`).all(t) as Array<{
-        session_id: string;
-      }>
-    ).map((r) => r.session_id);
-    return text(JSON.stringify({ id, delivered_to: subs }));
+    return text(JSON.stringify({ id, delivered_to: [target.id] }));
   }
 
   // ---- announce ----
+  // v3: status broadcast to live peers via the announcements table only.
+  // Topic fan-out is gone (the schema's announcements.topics column is
+  // retained nullable; nothing reads it).
   if (action === "announce") {
     const summary = typeof args.summary === "string" ? args.summary : "";
-    if (!summary) return text("cc: 'summary' required for announce.");
+    if (!summary) return errorText("cc.announce: 'summary' is required");
     const detail = typeof args.detail === "string" ? args.detail : null;
-    const topicsArg = Array.isArray(args.topics) ? (args.topics as string[]) : [];
     const id = newId("a");
     db.prepare(
       `INSERT INTO announcements (id, session_id, summary, detail, topics, created_at_ms)
-       VALUES (?, ?, ?, ?, ?, ?)`,
-    ).run(id, MY_SESSION_ID, summary, detail, JSON.stringify(topicsArg), now());
-    // Also fan-out a topic message per topic listed, so subscribers see it in `check`.
-    for (const rawT of topicsArg) {
-      const t = rawT.startsWith("#") ? rawT : `#${rawT}`;
-      db.prepare(
-        `INSERT INTO topics (name, created_at_ms) VALUES (?, ?) ON CONFLICT(name) DO NOTHING`,
-      ).run(t, now());
-      const dir = path.join(TOPICS_DIR, t);
-      const fname = `${now()}-${MY_SESSION_ID}-${id}.msg`;
-      atomicWrite(
-        dir,
-        fname,
-        buildMsgFile({
-          subject: "announce",
-          message: detail ? `${summary}\n\n${detail}` : summary,
-          urgency: "low",
-        }),
-      );
-    }
+       VALUES (?, ?, ?, ?, NULL, ?)`,
+    ).run(id, MY_SESSION_ID, summary, detail, now());
     return text(JSON.stringify({ id }));
   }
 
@@ -849,32 +781,12 @@ server.setRequestHandler(CallToolRequestSchema, async (req) => {
   }
 
   // ---- subscribe / unsubscribe ----
-  if (action === "subscribe") {
-    const topicRaw = typeof args.topic === "string" ? args.topic : "";
-    if (!topicRaw) return text("cc: 'topic' required.");
-    const t = topicRaw.startsWith("#") ? topicRaw : `#${topicRaw}`;
-    db.prepare(
-      `INSERT INTO topics (name, created_at_ms) VALUES (?, ?) ON CONFLICT(name) DO NOTHING`,
-    ).run(t, now());
-    db.prepare(
-      `INSERT INTO subscriptions (session_id, topic, subscribed_at_ms) VALUES (?, ?, ?)
-       ON CONFLICT(session_id, topic) DO NOTHING`,
-    ).run(MY_SESSION_ID, t, now());
-    if (typeof args.role === "string") {
-      db.prepare(`UPDATE sessions SET role = ? WHERE id = ?`).run(args.role, MY_SESSION_ID);
-    }
-    return text(JSON.stringify({ subscribed: subscriptionsFor(MY_SESSION_ID) }));
-  }
-
-  if (action === "unsubscribe") {
-    const topicRaw = typeof args.topic === "string" ? args.topic : "";
-    if (!topicRaw) return text("cc: 'topic' required.");
-    const t = topicRaw.startsWith("#") ? topicRaw : `#${topicRaw}`;
-    db.prepare(`DELETE FROM subscriptions WHERE session_id = ? AND topic = ?`).run(
-      MY_SESSION_ID,
-      t,
+  // v3: dropped from user surface; the verbs return a friendly error so
+  // existing automations get a clear pointer rather than silent failure.
+  if (action === "subscribe" || action === "unsubscribe") {
+    return errorText(
+      `cc.${action}: topic verbs were dropped in v3.0. The schema is retained for a future opt-in topic UX. Use cc.send or cc.announce instead.`,
     );
-    return text(JSON.stringify({ unsubscribed: [t] }));
   }
 
   // ---- cleanup ----
