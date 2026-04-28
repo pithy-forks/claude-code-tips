@@ -8,7 +8,7 @@ your accumulated claude code lore as a deterministic knowledge graph. every sess
 
 ```bash
 /plugin marketplace add anipotts/claude-code-tips
-/plugin install lore@cc
+/plugin install lore@claude-code-tips
 ```
 
 ## usage

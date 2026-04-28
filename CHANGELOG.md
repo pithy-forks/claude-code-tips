@@ -1,5 +1,13 @@
 # changelog
 
+## 2026-04-28b
+
+### marketplace rename: `cc` -> `claude-code-tips`
+- single-source-of-truth: there were three separate things named `cc` (marketplace internal name, plugin name, and a stale standalone github repo `anipotts/cc`). marketplace internal name renamed to `claude-code-tips` to remove that overload. plugin names unchanged (cc, lore, time still install the same way).
+- install commands: `cc@cc` -> `cc@claude-code-tips`, `lore@cc` -> `lore@claude-code-tips`, `time@cc` -> `time@claude-code-tips`. github clone path `anipotts/claude-code-tips` is unchanged.
+- BREAKING for users with the marketplace already added: run `/plugin marketplace remove cc` then `/plugin marketplace add anipotts/claude-code-tips` to pick up the new internal name. then re-install plugins with the new `<plugin>@claude-code-tips` syntax.
+- the standalone `anipotts/cc` github repo is being archived; do not use it. the canonical and only source is `anipotts/claude-code-tips`.
+
 ## 2026-04-28
 
 ### cc plugin v3.1.0

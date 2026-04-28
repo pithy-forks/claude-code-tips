@@ -1,7 +1,7 @@
 {
   "name": "claude-code-tips",
   "version": "3.1.0",
-  "description": "Claude Code toolkit: cc session mesh, lore knowledge graph, time awareness, hooks, agents, and docs. Install: /plugin marketplace add anipotts/claude-code-tips then /plugin install cc@cc lore@cc time@cc",
+  "description": "Claude Code toolkit: cc session mesh, lore knowledge graph, time awareness, hooks, agents, and docs. Install: /plugin marketplace add anipotts/claude-code-tips then /plugin install cc@claude-code-tips lore@claude-code-tips time@claude-code-tips",
   "author": {
     "name": "Ani Potts",
     "url": "https://github.com/anipotts"
