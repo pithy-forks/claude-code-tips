@@ -5,7 +5,7 @@
 [![CI](https://github.com/anipotts/claude-code-tips/actions/workflows/validate.yml/badge.svg)](https://github.com/anipotts/claude-code-tips/actions/workflows/validate.yml)
 [![GitHub estrellas](https://img.shields.io/github/stars/anipotts/claude-code-tips?style=flat-square&labelColor=111827&color=000)](https://github.com/anipotts/claude-code-tips/stargazers)
 [![último commit](https://img.shields.io/github/last-commit/anipotts/claude-code-tips?style=flat-square&labelColor=111827&color=000)](https://github.com/anipotts/claude-code-tips/commits/main)
-[![probado con](https://img.shields.io/badge/tested%20with-Claude%20Code%20v2.1.94-000?style=flat-square&labelColor=D4A574&logo=anthropic&logoColor=white)](https://docs.anthropic.com/en/docs/claude-code)
+[![probado con](https://img.shields.io/badge/tested%20with-Claude%20Code%20v2.1.122-000?style=flat-square&labelColor=D4A574&logo=anthropic&logoColor=white)](https://docs.anthropic.com/en/docs/claude-code)
 [![licencia](https://img.shields.io/github/license/anipotts/claude-code-tips?style=flat-square&labelColor=111827&color=000)](./LICENSE)
 
 patrones de Claude Code, probados en batalla en startups de YC, empresas tech públicas y unicornios. mantenido por alguien que usa Claude Code como su trabajo.
@@ -18,7 +18,7 @@ tres plugins, un marketplace.
 
 - **`lore@cc`** cada sesión extraída a sqlite. consultá costos, herramientas, errores, puntos calientes, bucles, y búsqueda de texto completo en tu propio historial. todo local.
 - **`cc@cc`** conciencia entre sesiones y mensajería. más un subsistema de `time`: `/cc:time-estimate` da estimaciones realistas de tiempo en Claude Code basadas en tu historial de sesiones, no en suposiciones optimistas.
-- **`fuel@cc`** indicador de combustible de 3 metros (sesión de 5 horas, semanal de 7 días, 200k de contexto). hook pre-turno empuja a Claude hacia handoffs más limpios conforme se llenan los metros. `/fuel state` los lee directamente; `/fuel handoff` redacta un punto de parada.
+- **`time@cc`** indicador de combustible de 3 metros (sesión de 5 horas, semanal de 7 días, 200k de contexto). hook pre-turno empuja a Claude hacia handoffs más limpios conforme se llenan los metros. `/fuel state` los lee directamente; `/fuel handoff` redacta un punto de parada.
 
 ```
 > /cc:time-estimate "reescribir middleware de auth y agregar tests"

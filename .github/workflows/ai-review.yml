@@ -1,10 +1,8 @@
 name: AI Review Team
 
-# both reviewers ride on github apps tied to the user's subscriptions
-# (claude max + chatgpt plus). this workflow posts one @mention comment per
-# pr/issue pointing both apps at the canonical rubric; the apps respond.
-# no api keys, no per-token billing, no curl plumbing.
-# see docs/review-process.md for the full process.
+# dual ai reviewer for prs and issues. posts one @mention comment per
+# pr/issue pointing the configured github apps (e.g. @claude, @codex) at
+# the canonical rubric in .github/AI_REVIEW_RUBRIC.md; the apps respond.
 
 on:
   pull_request:

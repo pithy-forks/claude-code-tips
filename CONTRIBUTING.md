@@ -19,7 +19,7 @@ thanks for looking at this repo. it's a personal claude code setup turned open s
 ## before you open a PR
 
 1. run the CI locally if you can (`plugin-smoke-test`, `validate`, `pr-quality-gate`) or just push and let Actions run
-2. tests pass (`pytest plugins/mine/tests` for mine; plugin-smoke-test workflow for both)
+2. tests pass (`bun test plugins/cc/tests` for cc; `pytest plugins/lore/tests` for lore; plugin-smoke-test workflow for all three)
 3. no em dashes in files you touched: `grep -RIn $'\xe2\x80\x94' <your files>`
 4. commit messages follow conventional format: `feat:`, `fix:`, `chore:`, `docs:`, `refactor:`, `style:`, `test:`
 5. one commit per logical change; no `git add -A` (stage specific files by name)
@@ -28,9 +28,11 @@ thanks for looking at this repo. it's a personal claude code setup turned open s
 
 ```bash
 # from a repo that uses claude code
-claude --plugin-dir /path/to/claude-code-tips/plugins/mine
-# or for cc
 claude --plugin-dir /path/to/claude-code-tips/plugins/cc
+# or for lore (knowledge graph)
+claude --plugin-dir /path/to/claude-code-tips/plugins/lore
+# or for time (resource meters)
+claude --plugin-dir /path/to/claude-code-tips/plugins/time
 ```
 
 the plugin is discovered via `.claude-plugin/plugin.json`; hooks wire up automatically.

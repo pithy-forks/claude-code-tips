@@ -1,4 +1,4 @@
-<!-- tested with: claude code v2.1.118 -->
+<!-- tested with: claude code v2.1.122 -->
 
 # cost
 
@@ -26,7 +26,7 @@ monitor is now a stable feature (v2.1.98+) and is the preferred method for long-
 
 **$200/mo.** Max plan. flat rate. no per-token billing. no surprises.
 
-that $200 covers everything. hundreds of sessions, thousands of subagent spawns. run `/mine` to see your own numbers.
+that $200 covers everything. hundreds of sessions, thousands of subagent spawns. run `/lore` to see your own numbers.
 
 ### what your plan costs
 
@@ -36,7 +36,7 @@ that $200 covers everything. hundreds of sessions, thousands of subagent spawns.
 | max | $200 | flat rate, 20x Pro limits. generous enough that most users won't hit them. |
 | API (pay-per-use) | variable | billed per token. caching saves ~87% on input costs. |
 
-on pro or max, **you don't pay per token.** the mine.db cost estimates are hypothetical: they show what your usage would cost at API list prices, not what you actually pay.
+on pro or max, **you don't pay per token.** the lore.db cost estimates are hypothetical: they show what your usage would cost at API list prices, not what you actually pay. legacy `~/.claude/mine.db` is auto-migrated by lore on first run.
 
 ### why caching still matters on a flat plan
 
@@ -141,7 +141,7 @@ don't compact every 5 turns -- the compaction itself costs a full round trip.
 
 ## the burn hook
 
-the mine plugin includes a cost anomaly detector that fires on PreCompact. it compares current session token usage against project averages and warns if you're burning more than usual.
+the lore plugin includes a cost anomaly detector that fires on PreCompact. it compares current session token usage against project averages and warns if you're burning more than usual.
 
 ```
 burn: this session used ~3.2x your average token count.
@@ -153,14 +153,14 @@ it doesn't block anything. just awareness. knowing you're on an expensive sessio
 
 ---
 
-## tracking costs with mine
+## tracking costs with lore
 
-the mine plugin logs every session to sqlite at `~/.claude/mine.db`. tracks input tokens, output tokens, cache creation, cache read -- per session, per model, per project.
+the lore plugin logs every session to sqlite at `~/.claude/lore/lore.db`. tracks input tokens, output tokens, cache creation, cache read -- per session, per model, per project.
 
 ```
-/mine                          # daily dashboard
-/mine intent: cost this month  # monthly spend breakdown
-/mine intent: cache efficiency  # cache hit rate analysis
+/lore                          # daily dashboard
+/lore intent: cost this month  # monthly spend breakdown
+/lore intent: cache efficiency # cache hit rate analysis
 ```
 
 ---
@@ -187,6 +187,6 @@ i've never hit a rate limit on max. on pro, i'd have been throttled in the first
 
 ## further reading
 
-- [mine plugin](https://github.com/anipotts/mine) -- burn feature, cost tracking, usage analysis
+- [lore plugin](../plugins/lore/) -- burn feature, cost tracking, usage analysis, knowledge graph
 - [agents](./agents.md) -- cost considerations for agent teams
 - [official pricing](https://docs.anthropic.com/en/docs/about-claude/models) -- current model pricing

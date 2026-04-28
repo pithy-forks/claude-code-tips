@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# tested with: claude code v2.1.118
+# tested with: claude code v2.1.122
 # cascade-uninstall the cc plugin: kills any running cc-server, clears
 # runtime state, drops version cache, and disables the plugin in
 # settings.local.json. Idempotent and safe to run multiple times.

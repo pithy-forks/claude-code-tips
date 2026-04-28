@@ -5,7 +5,7 @@
 [![CI](https://github.com/anipotts/claude-code-tips/actions/workflows/validate.yml/badge.svg)](https://github.com/anipotts/claude-code-tips/actions/workflows/validate.yml)
 [![GitHub stars](https://img.shields.io/github/stars/anipotts/claude-code-tips?style=flat-square&labelColor=111827&color=000)](https://github.com/anipotts/claude-code-tips/stargazers)
 [![last commit](https://img.shields.io/github/last-commit/anipotts/claude-code-tips?style=flat-square&labelColor=111827&color=000)](https://github.com/anipotts/claude-code-tips/commits/main)
-[![tested with](https://img.shields.io/badge/tested%20with-Claude%20Code%20v2.1.94-000?style=flat-square&labelColor=D4A574&logo=anthropic&logoColor=white)](https://docs.anthropic.com/en/docs/claude-code)
+[![tested with](https://img.shields.io/badge/tested%20with-Claude%20Code%20v2.1.122-000?style=flat-square&labelColor=D4A574&logo=anthropic&logoColor=white)](https://docs.anthropic.com/en/docs/claude-code)
 [![license](https://img.shields.io/github/license/anipotts/claude-code-tips?style=flat-square&labelColor=111827&color=000)](./LICENSE)
 
 claude code patterns, battle-tested across yc startups, public tech companies, and unicorns. maintained by someone who uses claude code as their job.
@@ -18,7 +18,7 @@ three plugins, one marketplace.
 
 - **`lore@cc`** every session mined into sqlite. query costs, tools, errors, hotspots, loops, and full-text search across your own history. everything local.
 - **`cc@cc`** cross-session awareness and messaging. plus a `time` subsystem: `/cc:time-estimate` gives realistic claude-code time grounded in your session history, not optimistic guesses.
-- **`fuel@cc`** 3-meter fuel gauge (5-hour session, 7-day weekly, 200k context). pre-turn hook nudges claude toward cleaner handoffs as the meters fill. `/fuel state` reads them directly; `/fuel handoff` drafts a stopping point.
+- **`time@cc`** 3-meter fuel gauge (5-hour session, 7-day weekly, 200k context). pre-turn hook nudges claude toward cleaner handoffs as the meters fill. `/fuel state` reads them directly; `/fuel handoff` drafts a stopping point.
 
 ```
 > /cc:time-estimate "rewrite auth middleware and add tests"
@@ -32,6 +32,7 @@ your time: ~15 min review
 /plugin marketplace add anipotts/claude-code-tips   # add marketplace (one time)
 /plugin install lore@cc                             # install lore (session analytics)
 /plugin install cc@cc                               # install cc (cross-session messaging)
+/plugin install time@cc                             # install time (fuel gauge + estimates)
 ```
 
 then: copy [safety-guard.sh](./hooks/safety-guard.sh) to block dangerous commands. read a [tip](./docs/tips/). done.
@@ -44,7 +45,7 @@ hundreds of sessions across dozens of projects. $200/mo max plan.
 
 same usage would cost ~$12K on the API with caching, ~$95K without. no autonomous loops. no cron jobs. every session starts with me typing a prompt. [how the cost math works &rarr;](./docs/cost.md)
 
-<img src="./gifs/mine-stats.gif" width="100%" alt="mine stats showing sessions, tokens, costs, and projects" />
+<img src="./gifs/mine-stats.gif" width="100%" alt="lore stats showing sessions, tokens, costs, and projects" />
 
 ---
 
@@ -54,6 +55,7 @@ same usage would cost ~$12K on the API with caching, ~$95K without. no autonomou
 /plugin marketplace add anipotts/claude-code-tips   # add marketplace (one time)
 /plugin install lore@cc                             # install lore (session analytics)
 /plugin install cc@cc                               # install cc (cross-session messaging)
+/plugin install time@cc                             # install time (fuel gauge + estimates)
 ```
 
 you get **[lore](./plugins/lore/)** · session mining to sqlite. costs, search, error memory, pattern detection. all data stays local at `~/.claude/lore/lore.db`.
@@ -186,7 +188,7 @@ plus [2 example commands](./examples/commands/) you can copy: `/sweep`, `/quickt
 |---|---|
 | [cost reality](./docs/cost.md) | what claude code actually costs, the prompt caching math |
 | [mistakes i made](./docs/mistakes.md) | what burned me so you can skip it |
-| [automation](./docs/automation.md) | the 12 CI pipelines that maintain this repo |
+| [automation](./docs/automation.md) | patterns for safe daemons, cron, and github actions with claude code |
 | [session workflow](./docs/session-workflow.md) | how i work day-to-day with claude code |
 | [worktrees](./docs/worktrees.md) | parallel exploration with the desktop app |
 
@@ -212,12 +214,12 @@ diplomatic, data-driven, no FUD. every claim cites a source.
 
 this repo runs on its own patterns.
 
-- **12 CI workflows** · docs audit, competitive intel, community digest, freshness check, stale cleanup, dependabot, releases, plugin smoke test, PR quality gate, validation, claude responder, upstream watcher
-- **11 hooks** running on every session
-- **<$1/month** CI cost · AI-powered workflows use haiku
-- **0 manual maintenance** · everything that doesn't require taste is automated
+- **CI workflows** for validation, freshness, competitive intel, community signal, releases, AI-assisted review
+- **9 standalone hooks + per-plugin hooks** across cc / lore / time
+- **AI-powered checks use haiku** so monthly CI cost stays under a couple of dollars
+- **automation handles the mechanical work** so judgment-heavy decisions stay human
 
-[automation details &rarr;](./docs/automation.md)
+[automation philosophy &rarr;](./docs/automation.md)
 
 ---
 

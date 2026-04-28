@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
-# tested with: claude code v2.1.118
+# tested with: claude code v2.1.122
 # =============================================================================
 # Safety Guard: PreToolUse command blocker
 # =============================================================================
