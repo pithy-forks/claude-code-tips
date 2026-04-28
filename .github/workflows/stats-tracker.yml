@@ -9,7 +9,7 @@ name: Stats Tracker
 # creates a tracking issue with week-over-week deltas.
 #
 # cost: $0 (api calls only, no claude usage)
-# tested with: claude code v2.1.94
+# tested with: claude code v2.1.122
 # ---------------------------------------------------------------
 
 on:

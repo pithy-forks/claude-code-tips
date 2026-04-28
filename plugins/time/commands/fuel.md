@@ -1,4 +1,4 @@
-<!-- tested with: claude code v2.1.118 -->
+<!-- tested with: claude code v2.1.122 -->
 ---
 description: Show current resource-meter state and draft handoffs before you run dry
 argument-hint: "[handoff | quiet | loud | state]"

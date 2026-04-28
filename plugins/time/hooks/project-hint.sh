@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# tested with: claude code v2.1.118
+# tested with: claude code v2.1.122
 # SessionStart hook: inject "you're in <project>, started at <time>" hint.
 # No cross-plugin reads. Pure stdlib. Always exits 0.
 

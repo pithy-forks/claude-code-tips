@@ -1,4 +1,4 @@
-<!-- tested with: claude code v2.1.118 -->
+<!-- tested with: claude code v2.1.122 -->
 
 # automation
 
@@ -10,28 +10,19 @@ my repo maintains itself. here's the full stack -- daemons, cron, github actions
 
 ---
 
-## my 12 pipelines
+## the philosophy
 
-i spend less than 30 minutes a week on maintenance. twelve CI workflows handle validation, freshness, competitive intel, community monitoring, and release management.
+automate everything that doesn't require taste. validation, linting, version stamps, stale-branch cleanup -- mechanical. content decisions, naming, architecture -- manual. the goal of a maintenance setup is that when you open the repo on monday, there's a digest of what changed in the ecosystem, what the community is talking about, and any staleness flags. you read, decide, act.
 
-| workflow | trigger | what it does | cost/run |
-|----------|---------|-------------|----------|
-| validate | push, PR | markdown lint, link check, hook syntax, JSON, python, plugin smoke | $0 |
-| pr-quality-gate | PR | checks "tested with" stamps, hook conventions, PR description | $0 |
-| plugin-smoke-test | PR + push | validates mine plugin install, hook structure, permissions | $0 |
-| claude-responder | issue, PR | auto-triages issues and reviews external PRs via headless claude | ~$0.05 |
-| freshness-check | weekly cron | flags files with version stamps >2 versions behind | ~$0.01 |
-| docs-audit | weekly cron | checks docs for outdated info, missing cross-refs | ~$0.05 |
-| competitive-update | weekly cron | monitors cursor, copilot, codex, gemini-cli releases and pricing | $0 |
-| community-digest | weekly cron | summarizes reddit, HN, trending repos into a github issue | $0 |
-| official-watcher | cron | monitors official claude code releases, changelog, docs | ~$0.02 |
-| stale-cleanup | daily cron | closes old auto/ PRs, prunes orphan branches, supersedes old issues | $0 |
-| dependabot-auto-merge | dependabot PR | auto-merges patch/minor bumps, labels major for review | $0 |
-| release | tag push | bumps plugin.json version, generates changelog, creates GH release | $0 |
+categories of automation worth setting up early:
 
-**the philosophy:** automate everything that doesn't require taste. validation, linting, version stamps, stale branch cleanup -- mechanical. content decisions, naming, architecture -- manual.
+- **validation on every PR** -- markdown lint, link check, hook syntax, JSON, python, plugin smoke
+- **freshness checks** -- flag files whose version stamps fall behind upstream
+- **release pipeline** -- tag push -> bump manifests -> generate changelog -> create GH release
+- **stale cleanup** -- close ancient auto-PRs, prune orphan branches
+- **dependabot auto-merge** -- patch/minor bumps merge themselves; major bumps get a label and wait for a human
 
-the goal: when i open the repo on monday, there's an issue summarizing what changed in the ecosystem, a digest of community activity, and any staleness flags. i read, decide, act.
+ai-powered maintenance is also viable on the cheap: weekly competitive-intel, docs audits, official-changelog watching. on haiku these run for cents per execution. only spin them up once your manual versions are working -- otherwise you're debugging a bot debugging your repo.
 
 ---
 
@@ -191,7 +182,7 @@ to stop: `touch .claude/guardian-kill`. to restart: `rm .claude/guardian-kill` a
 
 the pattern that works: **automate the analysis, leave the action to humans.** let claude find problems, propose fixes, draft PRs. let a human click merge.
 
-total monthly cost: **< $1**. github actions free tier covers all 12 workflows. the AI-powered ones (claude-responder, docs-audit, official-watcher) use haiku at ~$0.05/run and fire weekly or on events. the rest are pure bash/python with zero API cost.
+a sensible monthly target: **under $2/month** for a hobby-scale repo. github actions free tier covers most validation. ai-powered jobs (review bots, docs audits, watchers) on haiku run for cents per execution. the cheap ones are pure bash/python at zero api cost.
 
 ---
 

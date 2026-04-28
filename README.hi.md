@@ -5,7 +5,7 @@
 [![CI](https://github.com/anipotts/claude-code-tips/actions/workflows/validate.yml/badge.svg)](https://github.com/anipotts/claude-code-tips/actions/workflows/validate.yml)
 [![GitHub stars](https://img.shields.io/github/stars/anipotts/claude-code-tips?style=flat-square&labelColor=111827&color=000)](https://github.com/anipotts/claude-code-tips/stargazers)
 [![last commit](https://img.shields.io/github/last-commit/anipotts/claude-code-tips?style=flat-square&labelColor=111827&color=000)](https://github.com/anipotts/claude-code-tips/commits/main)
-[![tested with](https://img.shields.io/badge/tested%20with-Claude%20Code%20v2.1.94-000?style=flat-square&labelColor=D4A574&logo=anthropic&logoColor=white)](https://docs.anthropic.com/en/docs/claude-code)
+[![tested with](https://img.shields.io/badge/tested%20with-Claude%20Code%20v2.1.122-000?style=flat-square&labelColor=D4A574&logo=anthropic&logoColor=white)](https://docs.anthropic.com/en/docs/claude-code)
 [![license](https://img.shields.io/github/license/anipotts/claude-code-tips?style=flat-square&labelColor=111827&color=000)](./LICENSE)
 
 claude code के पैटर्न, जो YC startups, public tech companies और unicorns में battle-tested हैं। किसी के द्वारा maintain किया जाता है जो claude code को अपनी job के तौर पर use करते हैं।
@@ -18,7 +18,7 @@ claude code के पैटर्न, जो YC startups, public tech companies
 
 - **`lore@cc`** हर session को sqlite में मined किया जाता है। costs, tools, errors, hotspots, loops और अपने पूरे history के across full-text search को query करो। सब कुछ local है।
 - **`cc@cc`** cross-session awareness और messaging। साथ ही एक `time` subsystem: `/cc:time-estimate` realistic claude-code time देता है जो तुम्हारे session history में grounded होता है, optimistic guesses नहीं।
-- **`fuel@cc`** 3-meter fuel gauge (5-hour session, 7-day weekly, 200k context)। pre-turn hook claude को cleaner handoffs की ओर nudge करता है जबकि meters भरते हैं। `/fuel state` उन्हें directly पढ़ता है; `/fuel handoff` एक stopping point को draft करता है।
+- **`time@cc`** 3-meter fuel gauge (5-hour session, 7-day weekly, 200k context)। pre-turn hook claude को cleaner handoffs की ओर nudge करता है जबकि meters भरते हैं। `/fuel state` उन्हें directly पढ़ता है; `/fuel handoff` एक stopping point को draft करता है।
 
 ```
 > /cc:time-estimate "rewrite auth middleware and add tests"

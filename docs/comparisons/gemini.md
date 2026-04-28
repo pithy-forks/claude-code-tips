@@ -1,4 +1,4 @@
-<!-- tested with: claude code v2.1.118 -->
+<!-- tested with: claude code v2.1.122 -->
 
 # claude code vs gemini
 
@@ -34,7 +34,7 @@ based on our testing, claude models consistently perform well for code generatio
 
 ### session history and mining
 
-based on our testing, claude code sessions as JSON transcripts you can parse, search, and mine offer a significant advantage for workflow optimization. the mine plugin builds sqlite databases from session data. gemini has conversation checkpointing but no equivalent export/analysis ecosystem.
+based on our testing, claude code sessions as JSON transcripts you can parse, search, and mine offer a significant advantage for workflow optimization. the lore plugin builds sqlite databases from session data. gemini has conversation checkpointing but no equivalent export/analysis ecosystem.
 
 ### IDE extensions
 

@@ -3,7 +3,7 @@ name: export
 description: export the lore knowledge graph or its slices to json, csv, or markdown
 tools: Bash, Read, AskUserQuestion
 ---
-<!-- tested with: claude code v2.1.118 -->
+<!-- tested with: claude code v2.1.122 -->
 
 When the user runs `/lore:export`, write a portable snapshot of the lore data they care about. Default destination is the current working directory; respect any path the user gives.
 

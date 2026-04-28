@@ -1,9 +1,9 @@
 name: Plugin Smoke Test
 
 # ---------------------------------------------------------------
-# validates the mine plugin can be installed and its hooks
-# are structurally correct. catches broken plugin.json,
-# missing scripts, bad permissions, and import errors.
+# validates that all marketplace plugins (cc, lore, time) install
+# cleanly and their hooks are structurally correct. catches broken
+# plugin.json, missing scripts, bad permissions, import errors.
 #
 # runs on PRs that touch plugin files and on main pushes.
 #

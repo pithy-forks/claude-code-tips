@@ -1,4 +1,4 @@
-<!-- tested with: claude code v2.1.118 -->
+<!-- tested with: claude code v2.1.122 -->
 
 # mistakes i made
 
@@ -45,15 +45,15 @@ these are the tool-level patterns that show up in the data:
 
 the real insight: only 8 errors were captured across hundreds of sessions. the error *rate* is low. the expensive mistakes aren't errors -- they're bad decisions that succeed (like force-pushing or editing without reading).
 
-## what /mine mistakes actually shows
+## what /lore mistakes actually shows
 
-the `mistakes` feature in the mine plugin tracks error patterns across sessions. it watches for tool calls that fail, commands that get blocked by hooks, and patterns that repeat.
+the `mistakes` feature in the lore plugin tracks error patterns across sessions. it watches for tool calls that fail, commands that get blocked by hooks, and patterns that repeat.
 
 ```
-/mine mistakes
+/lore mistakes
 ```
 
-real patterns from this user's mine.db:
+real patterns from this user's lore.db:
 
 | pattern | what it means |
 |---------|---------------|
@@ -66,5 +66,5 @@ the value isn't seeing individual errors. it's seeing which errors are *systemat
 
 ## further reading
 
-- [mine plugin](https://github.com/anipotts/mine) -- full feature docs including mistakes, search, burn
+- [lore plugin](../plugins/lore/) -- full feature docs including mistakes, search, burn, knowledge graph
 - [hooks](./hooks.md) -- the enforcement hooks that prevent recurring mistakes

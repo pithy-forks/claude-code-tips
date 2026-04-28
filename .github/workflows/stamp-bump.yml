@@ -10,7 +10,7 @@ name: Stamp Bump
 # new version.
 #
 # cost: $0 (pure shell, no API calls)
-# tested with: claude code v2.1.94
+# tested with: claude code v2.1.122
 # ---------------------------------------------------------------
 
 on:

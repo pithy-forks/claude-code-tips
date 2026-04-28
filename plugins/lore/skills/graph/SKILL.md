@@ -3,7 +3,7 @@ name: graph
 description: explore relationships in the lore knowledge graph - cooccurring files, project sessions, sibling sessions, tagged notes
 tools: Bash, Read, AskUserQuestion
 ---
-<!-- tested with: claude code v2.1.118 -->
+<!-- tested with: claude code v2.1.122 -->
 
 When the user runs `/lore:graph`, surface relationships derived from their session history. Unlike `/lore` (which is a dashboard / freeform query) this skill is *graph-shaped*: nodes are sessions, files, projects, tools, and notes; edges are cooccurrence, parent-child, and tags.
 

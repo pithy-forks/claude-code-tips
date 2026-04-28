@@ -4,7 +4,7 @@ description: estimate CC active time for a task using the time rule, with dynami
 argument-hint: <task description>
 user-invocable: false
 ---
-<!-- tested with: claude code v2.1.118 -->
+<!-- tested with: claude code v2.1.122 -->
 
 # /time-estimate
 

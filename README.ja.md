@@ -5,7 +5,7 @@
 [![CI](https://github.com/anipotts/claude-code-tips/actions/workflows/validate.yml/badge.svg)](https://github.com/anipotts/claude-code-tips/actions/workflows/validate.yml)
 [![GitHub stars](https://img.shields.io/github/stars/anipotts/claude-code-tips?style=flat-square&labelColor=111827&color=000)](https://github.com/anipotts/claude-code-tips/stargazers)
 [![last commit](https://img.shields.io/github/last-commit/anipotts/claude-code-tips?style=flat-square&labelColor=111827&color=000)](https://github.com/anipotts/claude-code-tips/commits/main)
-[![tested with](https://img.shields.io/badge/tested%20with-Claude%20Code%20v2.1.94-000?style=flat-square&labelColor=D4A574&logo=anthropic&logoColor=white)](https://docs.anthropic.com/en/docs/claude-code)
+[![tested with](https://img.shields.io/badge/tested%20with-Claude%20Code%20v2.1.122-000?style=flat-square&labelColor=D4A574&logo=anthropic&logoColor=white)](https://docs.anthropic.com/en/docs/claude-code)
 [![license](https://img.shields.io/github/license/anipotts/claude-code-tips?style=flat-square&labelColor=111827&color=000)](./LICENSE)
 
 YCスタートアップから大手テック企業、ユニコーン企業まで、実戦で鍛えられたClaudeコードのパターン集。Claude Codeを仕事にしている人間が保守している。
@@ -18,7 +18,7 @@ YCスタートアップから大手テック企業、ユニコーン企業まで
 
 - **`lore@cc`** 全セッションをsqliteに蓄積。費用、ツール、エラー、ホットスポット、ループ、全文検索をお前の履歴から引き出す。全部ローカル。
 - **`cc@cc`** セッション横断の認識とメッセージング。加えて`time`サブシステム：`/cc:time-estimate`は楽観的な推測ではなく、お前のセッション履歴に基づいたリアルなClaudeコード時間を返す。
-- **`fuel@cc`** 3メートルのフューエルゲージ（5時間セッション、7日週間、200kコンテキスト）。メータが満杯に近づくと、PreTurnフックがClaudeをより明快なハンドオフに導く。`/fuel state`で直接読み込める。`/fuel handoff`で停止ポイントのドラフトを作る。
+- **`time@cc`** 3メートルのフューエルゲージ（5時間セッション、7日週間、200kコンテキスト）。メータが満杯に近づくと、PreTurnフックがClaudeをより明快なハンドオフに導く。`/fuel state`で直接読み込める。`/fuel handoff`で停止ポイントのドラフトを作る。
 
 ```
 > /cc:time-estimate "rewrite auth middleware and add tests"

@@ -3,7 +3,7 @@ name: remember
 description: capture decisions, lessons, reminders, and todos into the lore knowledge graph
 tools: Bash, Read, AskUserQuestion
 ---
-<!-- tested with: claude code v2.1.118 -->
+<!-- tested with: claude code v2.1.122 -->
 
 When the user runs `/lore:remember`, your job is to persist what they want to keep into the `notes` table of `~/.claude/lore/lore.db`. This is the user-controlled layer of the knowledge graph -- the parts of memory that can't be inferred from JSONL alone.
 

@@ -1,4 +1,4 @@
-<!-- tested with: claude code v2.1.118 -->
+<!-- tested with: claude code v2.1.122 -->
 
 # hooks v2: the five handler types
 

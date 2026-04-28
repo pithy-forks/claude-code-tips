@@ -5,7 +5,7 @@
   },
   "metadata": {
     "description": "claude code plugins by ani potts: session mesh, knowledge graph over your history, and time awareness.",
-    "version": "3.0.0"
+    "version": "3.1.0"
   },
   "plugins": [
     {
@@ -27,7 +27,7 @@
     {
       "name": "time",
       "source": "./plugins/time",
-      "description": "claude's awareness of how alive it is. 5h + 7d + context-window meters with a budgeting rule. /time:left, /time:estimate, /time:handoff.",
+      "description": "claude's awareness of how alive it is. 5h + 7d + context-window meters with a budgeting rule. /time-estimate, /time-calibrate, /time-benchmark, /fuel state|handoff.",
       "author": { "name": "Ani Potts" },
       "license": "MIT",
       "category": "awareness"

@@ -4,7 +4,7 @@ description: query the lore knowledge graph for sessions, costs, tools, projects
 tools: Bash, Read, AskUserQuestion, CronCreate, CronDelete, CronList
 ---
 When the user runs /lore (or asks anything that requires reading their session history), interpret their intent and query the lore SQLite database accordingly. The database lives at ~/.claude/lore/lore.db (v2.0+) with a fallback at ~/.claude/mine.db (v1.x). All queries below read from the resolved path.
-<!-- tested with: claude code v2.1.118 -->
+<!-- tested with: claude code v2.1.122 -->
 
 ## ALWAYS use the absolute path
 

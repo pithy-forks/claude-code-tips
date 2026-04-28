@@ -34,13 +34,14 @@ jobs:
           echo "version=$TAG" >> "$GITHUB_OUTPUT"
           echo "tag=v$TAG" >> "$GITHUB_OUTPUT"
 
-      - name: Update plugin.json version
+      - name: Update plugin.json + marketplace versions
         env:
           VERSION: ${{ steps.version.outputs.version }}
         run: |
-          PLUGIN_JSON="plugins/mine/.claude-plugin/plugin.json"
-          if [ -f "$PLUGIN_JSON" ]; then
-            python3 -c "
+          # bump cc plugin.json (flagship; mirrors package.json), root plugin.json, and marketplace metadata
+          for PLUGIN_JSON in plugins/cc/.claude-plugin/plugin.json plugins/cc/package.json .claude-plugin/plugin.json; do
+            if [ -f "$PLUGIN_JSON" ]; then
+              python3 -c "
           import json, sys
           with open(sys.argv[1], 'r') as f:
               data = json.load(f)
@@ -49,7 +50,22 @@ jobs:
               json.dump(data, f, indent=2)
               f.write('\n')
           " "$PLUGIN_JSON" "$VERSION"
-            echo "Updated $PLUGIN_JSON to $VERSION"
+              echo "Updated $PLUGIN_JSON to $VERSION"
+            fi
+          done
+
+          MARKETPLACE_JSON=".claude-plugin/marketplace.json"
+          if [ -f "$MARKETPLACE_JSON" ]; then
+            python3 -c "
+          import json, sys
+          with open(sys.argv[1], 'r') as f:
+              data = json.load(f)
+          data.setdefault('metadata', {})['version'] = sys.argv[2]
+          with open(sys.argv[1], 'w') as f:
+              json.dump(data, f, indent=2)
+              f.write('\n')
+          " "$MARKETPLACE_JSON" "$VERSION"
+            echo "Updated $MARKETPLACE_JSON metadata.version to $VERSION"
           fi
 
       - name: Generate changelog

@@ -3,7 +3,7 @@ name: time-calibrate
 description: measure your real CC throughput against the time rule's matrix, using lore.db
 user-invocable: false
 ---
-<!-- tested with: claude code v2.1.118 -->
+<!-- tested with: claude code v2.1.122 -->
 
 # /time-calibrate
 
