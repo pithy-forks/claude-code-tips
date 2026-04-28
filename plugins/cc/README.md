@@ -11,7 +11,7 @@ so two agents never silently clobber the same file. zero-token when quiet,
 
 ```
 /plugin marketplace add anipotts/claude-code-tips
-/plugin install cc@claude-code-tips
+/plugin install cc@anipotts
 ```
 
 zero configuration. works on macos, linux, wsl.
@@ -174,7 +174,7 @@ sessions converge safely.
 if you used `/cc:time-estimate`, `/cc:time-calibrate`, `/cc:time-benchmark`, or the SessionStart project-timing hint, those moved out of cc into a focused `time` plugin in this same marketplace. install it with:
 
 ```
-/plugin install time@claude-code-tips
+/plugin install time@anipotts
 ```
 
 cc 3.0 is **session mesh, period.** email-cc semantics for agents.
@@ -216,7 +216,7 @@ The script:
    bun-source forms),
 2. wipes `~/.claude/channels/cc/` (`--keep-data` to preserve it),
 3. removes the cc version cache under `~/.claude/plugins/cache/cc/cc/`,
-4. removes `cc@claude-code-tips` from `enabledPlugins` in `settings.local.json`.
+4. removes `cc@anipotts` from `enabledPlugins` in `settings.local.json`.
 
 > **Important: restart Claude Code afterwards.** If you run the script
 > from inside a CC session that has the cc plugin loaded, the parent CC
@@ -228,7 +228,7 @@ The script:
 To reinstall fresh:
 
 ```
-/plugin install cc@claude-code-tips
+/plugin install cc@anipotts
 ```
 
 The script is idempotent and safe to run multiple times.
