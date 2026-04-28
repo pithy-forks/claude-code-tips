@@ -1,43 +1,30 @@
-<!-- tested with: claude code v2.1.121 -->
+<!-- tested with: claude code v2.1.122 -->
 
 # cc plugin — backlog
 
-Deferred work captured during the v3 imessage-alignment pass (PR #56).
-Each item has the original conversation context noted so a future
-Claude session can pick it up without re-deriving the rationale.
+Deferred work captured during the v3 imessage-alignment pass (PR #56)
+and the v3.1 context-diet pass. Each item has the original conversation
+context noted so a future Claude session can pick it up without re-
+deriving the rationale.
 
-## naming: triple-cc repetition in MCP tool names
+## ✅ resolved in v3.1 (kept for traceability)
 
-Tools currently surface as:
-
-```
-mcp__plugin_cc_cc__cc_sessions
-mcp__plugin_cc_cc__cc_send
-mcp__plugin_cc_cc__cc_announce
-mcp__plugin_cc_cc__cc_check
-mcp__plugin_cc_cc__cc_cleanup
-```
-
-Three stacked `cc`s: marketplace name (cc) + plugin name (cc) + tool
-prefix (cc_). The marketplace+plugin doubling is intrinsic to Claude
-Code's namespace (`mcp__plugin_<marketplace>_<plugin>__<tool>`); the
-tool prefix is something we added on top.
-
-**Easy fix (low risk):** drop the `cc_` prefix from tool names —
-they become `sessions`, `send`, `announce`, `check`, `cleanup`. Final
-shape: `mcp__plugin_cc_cc__sessions`. Still has the cc_cc but at
-least no triple. Mirrors imessage's pattern: imessage's tools are
-`reply` and `chat_messages`, not `imessage_reply`.
-
-**Bigger fix (breaking):** rename the marketplace from `cc` to
-something distinct (e.g. `tips`, `potts`, `cck`). Install command
-becomes `cc@tips` instead of `cc@cc`. Breaks every doc + every
-existing user's `enabledPlugins` entry. Not worth the churn unless
-we're doing a v4 rebrand anyway.
-
-Decision context: user flagged this as "ugly naming" while reading
-the post-install instructions. Acknowledged + backlogged for after
-v3 ships.
+- **5 tools → 1 verb-dispatch tool** (D2). Single `cc` tool with
+  action-discriminated args via zod's discriminated union. Triple-cc
+  naming bug retired automatically: `mcp__plugin_cc_cc__cc`.
+- **Dead verbs purged** (D5). `subscribe`, `unsubscribe`, `ask`,
+  `answer` removed from schema entirely.
+- **`cc_cleanup` hidden** (D6). Internal to the shutdown handler now,
+  not advertised to the model.
+- **Instructions trimmed** (D4). 1053B → 697B. Behavioral rules only;
+  per-action call signatures live in TOOL_DESCRIPTION + JSON Schema.
+- **Slash command → SKILL.md** (D3). `commands/sessions.md` deleted;
+  `skills/sessions/SKILL.md` triages on natural-language intent.
+- **Lifecycle unified** (D8). Heartbeat/tail/watcher/db registered
+  with `Lifecycle` and torn down LIFO on shutdown.
+- **In-process TTL cache** added for `liveSessions` and
+  `recentFilesFor`. Byte-stable output across sub-turn calls keeps
+  Anthropic's 5-min prompt cache hot.
 
 ## per-project mesh (decision 16-B from PR #56)
 
