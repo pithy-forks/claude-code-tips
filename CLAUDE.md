@@ -2,7 +2,7 @@
 
 # claude-code-tips
 
-personal claude code setup, open source. hooks, example agents/commands, opinionated docs. marketplace name: `cc` (install via `anipotts@cc`).
+personal claude code setup, open source. hooks, example agents/commands, opinionated docs. marketplace: `anipotts/claude-code-tips`.
 
 ## Structure
 

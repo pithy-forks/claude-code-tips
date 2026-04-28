@@ -138,9 +138,9 @@ this repo is a plugin marketplace. check `/.claude-plugin/marketplace.json`. to 
 
 ```bash
 /plugin marketplace add anipotts/claude-code-tips
-/plugin install cc@cc      # session mesh
-/plugin install lore@cc    # knowledge graph (was "mine" pre-v2.0)
-/plugin install time@cc    # 5h/7d/context meters + /fuel
+/plugin install cc@claude-code-tips      # session mesh
+/plugin install lore@claude-code-tips    # knowledge graph (was "mine" pre-v2.0)
+/plugin install time@claude-code-tips    # 5h/7d/context meters + /fuel
 ```
 
 ## try it

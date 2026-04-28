@@ -16,9 +16,9 @@ YCスタートアップから大手テック企業、ユニコーン企業まで
 
 3つのプラグイン、1つのマーケットプレイス。
 
-- **`lore@cc`** 全セッションをsqliteに蓄積。費用、ツール、エラー、ホットスポット、ループ、全文検索をお前の履歴から引き出す。全部ローカル。
-- **`cc@cc`** セッション横断の認識とメッセージング。加えて`time`サブシステム：`/cc:time-estimate`は楽観的な推測ではなく、お前のセッション履歴に基づいたリアルなClaudeコード時間を返す。
-- **`time@cc`** 3メートルのフューエルゲージ（5時間セッション、7日週間、200kコンテキスト）。メータが満杯に近づくと、PreTurnフックがClaudeをより明快なハンドオフに導く。`/fuel state`で直接読み込める。`/fuel handoff`で停止ポイントのドラフトを作る。
+- **`lore@claude-code-tips`** 全セッションをsqliteに蓄積。費用、ツール、エラー、ホットスポット、ループ、全文検索をお前の履歴から引き出す。全部ローカル。
+- **`cc@claude-code-tips`** セッション横断の認識とメッセージング。加えて`time`サブシステム：`/cc:time-estimate`は楽観的な推測ではなく、お前のセッション履歴に基づいたリアルなClaudeコード時間を返す。
+- **`time@claude-code-tips`** 3メートルのフューエルゲージ（5時間セッション、7日週間、200kコンテキスト）。メータが満杯に近づくと、PreTurnフックがClaudeをより明快なハンドオフに導く。`/fuel state`で直接読み込める。`/fuel handoff`で停止ポイントのドラフトを作る。
 
 ```
 > /cc:time-estimate "rewrite auth middleware and add tests"
@@ -30,8 +30,8 @@ your time: ~15 min review
 
 ```bash
 /plugin marketplace add anipotts/claude-code-tips   # マーケットプレイスを追加（1回だけ）
-/plugin install lore@cc                             # loreをインストール（セッション分析）
-/plugin install cc@cc                               # ccをインストール（クロスセッションメッセージング）
+/plugin install lore@claude-code-tips                             # loreをインストール（セッション分析）
+/plugin install cc@claude-code-tips                               # ccをインストール（クロスセッションメッセージング）
 ```
 
 その後：[safety-guard.sh](./hooks/safety-guard.sh)をコピーして危険なコマンドをブロック。[tips](./docs/tips/)を読む。完了。
@@ -52,8 +52,8 @@ your time: ~15 min review
 
 ```bash
 /plugin marketplace add anipotts/claude-code-tips   # マーケットプレイスを追加（1回だけ）
-/plugin install lore@cc                             # loreをインストール（セッション分析）
-/plugin install cc@cc                               # ccをインストール（クロスセッションメッセージング）
+/plugin install lore@claude-code-tips                             # loreをインストール（セッション分析）
+/plugin install cc@claude-code-tips                               # ccをインストール（クロスセッションメッセージング）
 ```
 
 **[lore](./plugins/lore/)**が手に入る。セッション採掘からsqlite。費用、検索、エラーメモリ、パターン検出。全データは`~/.claude/lore/lore.db`でローカルに残る。
@@ -75,7 +75,7 @@ your time: ~15 min review
 クロスセッションメッセージングと`time`サブシステム。ほかのClaudeコードセッションが何をしているか確認、セッション間でメッセージを送信、お前のセッション履歴に基づいたリアルな時間推定を得る。
 
 ```bash
-/plugin install cc@cc
+/plugin install cc@claude-code-tips
 ```
 
 ```

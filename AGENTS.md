@@ -2,7 +2,7 @@
 
 # claude-code-tips (codex / openai agents pointer)
 
-personal claude code setup, open source. hooks, example agents/commands, opinionated docs. marketplace name: `cc` (install via `anipotts@cc`).
+personal claude code setup, open source. hooks, example agents/commands, opinionated docs. marketplace: `anipotts/claude-code-tips`.
 
 this file mirrors `CLAUDE.md` for codex and other openai-convention agents. same repo, same rules, same review contract.
 

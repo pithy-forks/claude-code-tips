@@ -16,9 +16,9 @@ new here? start with the [tips index](./docs/tips/) or skim [hooks](./docs/hooks
 
 three plugins, one marketplace.
 
-- **`lore@cc`** every session mined into sqlite. query costs, tools, errors, hotspots, loops, and full-text search across your own history. everything local.
-- **`cc@cc`** cross-session awareness and messaging. plus a `time` subsystem: `/cc:time-estimate` gives realistic claude-code time grounded in your session history, not optimistic guesses.
-- **`time@cc`** 3-meter fuel gauge (5-hour session, 7-day weekly, 200k context). pre-turn hook nudges claude toward cleaner handoffs as the meters fill. `/fuel state` reads them directly; `/fuel handoff` drafts a stopping point.
+- **`lore@claude-code-tips`** every session mined into sqlite. query costs, tools, errors, hotspots, loops, and full-text search across your own history. everything local.
+- **`cc@claude-code-tips`** cross-session awareness and messaging. plus a `time` subsystem: `/cc:time-estimate` gives realistic claude-code time grounded in your session history, not optimistic guesses.
+- **`time@claude-code-tips`** 3-meter fuel gauge (5-hour session, 7-day weekly, 200k context). pre-turn hook nudges claude toward cleaner handoffs as the meters fill. `/fuel state` reads them directly; `/fuel handoff` drafts a stopping point.
 
 ```
 > /cc:time-estimate "rewrite auth middleware and add tests"
@@ -30,9 +30,9 @@ your time: ~15 min review
 
 ```bash
 /plugin marketplace add anipotts/claude-code-tips   # add marketplace (one time)
-/plugin install lore@cc                             # install lore (session analytics)
-/plugin install cc@cc                               # install cc (cross-session messaging)
-/plugin install time@cc                             # install time (fuel gauge + estimates)
+/plugin install lore@claude-code-tips                             # install lore (session analytics)
+/plugin install cc@claude-code-tips                               # install cc (cross-session messaging)
+/plugin install time@claude-code-tips                             # install time (fuel gauge + estimates)
 ```
 
 then: copy [safety-guard.sh](./hooks/safety-guard.sh) to block dangerous commands. read a [tip](./docs/tips/). done.
@@ -53,9 +53,9 @@ same usage would cost ~$12K on the API with caching, ~$95K without. no autonomou
 
 ```bash
 /plugin marketplace add anipotts/claude-code-tips   # add marketplace (one time)
-/plugin install lore@cc                             # install lore (session analytics)
-/plugin install cc@cc                               # install cc (cross-session messaging)
-/plugin install time@cc                             # install time (fuel gauge + estimates)
+/plugin install lore@claude-code-tips                             # install lore (session analytics)
+/plugin install cc@claude-code-tips                               # install cc (cross-session messaging)
+/plugin install time@claude-code-tips                             # install time (fuel gauge + estimates)
 ```
 
 you get **[lore](./plugins/lore/)** · session mining to sqlite. costs, search, error memory, pattern detection. all data stays local at `~/.claude/lore/lore.db`.
@@ -77,7 +77,7 @@ start with `lore` + the `safety-guard` hook. add more as you go. **[lore docs &r
 cross-session messaging and the `time` subsystem. see what other claude code sessions are doing, send messages between them, and get realistic time estimates grounded in your own session history.
 
 ```bash
-/plugin install cc@cc
+/plugin install cc@claude-code-tips
 ```
 
 ```

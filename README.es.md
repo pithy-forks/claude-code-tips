@@ -16,9 +16,9 @@ patrones de Claude Code, probados en batalla en startups de YC, empresas tech p�
 
 tres plugins, un marketplace.
 
-- **`lore@cc`** cada sesión extraída a sqlite. consultá costos, herramientas, errores, puntos calientes, bucles, y búsqueda de texto completo en tu propio historial. todo local.
-- **`cc@cc`** conciencia entre sesiones y mensajería. más un subsistema de `time`: `/cc:time-estimate` da estimaciones realistas de tiempo en Claude Code basadas en tu historial de sesiones, no en suposiciones optimistas.
-- **`time@cc`** indicador de combustible de 3 metros (sesión de 5 horas, semanal de 7 días, 200k de contexto). hook pre-turno empuja a Claude hacia handoffs más limpios conforme se llenan los metros. `/fuel state` los lee directamente; `/fuel handoff` redacta un punto de parada.
+- **`lore@claude-code-tips`** cada sesión extraída a sqlite. consultá costos, herramientas, errores, puntos calientes, bucles, y búsqueda de texto completo en tu propio historial. todo local.
+- **`cc@claude-code-tips`** conciencia entre sesiones y mensajería. más un subsistema de `time`: `/cc:time-estimate` da estimaciones realistas de tiempo en Claude Code basadas en tu historial de sesiones, no en suposiciones optimistas.
+- **`time@claude-code-tips`** indicador de combustible de 3 metros (sesión de 5 horas, semanal de 7 días, 200k de contexto). hook pre-turno empuja a Claude hacia handoffs más limpios conforme se llenan los metros. `/fuel state` los lee directamente; `/fuel handoff` redacta un punto de parada.
 
 ```
 > /cc:time-estimate "reescribir middleware de auth y agregar tests"
@@ -30,8 +30,8 @@ tu tiempo: ~15 min revisión
 
 ```bash
 /plugin marketplace add anipotts/claude-code-tips   # agregar marketplace (una sola vez)
-/plugin install lore@cc                             # instalar lore (analítica de sesiones)
-/plugin install cc@cc                               # instalar cc (mensajería entre sesiones)
+/plugin install lore@claude-code-tips                             # instalar lore (analítica de sesiones)
+/plugin install cc@claude-code-tips                               # instalar cc (mensajería entre sesiones)
 ```
 
 después: copiá [safety-guard.sh](./hooks/safety-guard.sh) para bloquear comandos peligrosos. leé un [consejo](./docs/tips/). listo.
@@ -52,8 +52,8 @@ el mismo uso costaría ~$12K en la API con caching, ~$95K sin. sin bucles autón
 
 ```bash
 /plugin marketplace add anipotts/claude-code-tips   # agregar marketplace (una sola vez)
-/plugin install lore@cc                             # instalar lore (analítica de sesiones)
-/plugin install cc@cc                               # instalar cc (mensajería entre sesiones)
+/plugin install lore@claude-code-tips                             # instalar lore (analítica de sesiones)
+/plugin install cc@claude-code-tips                               # instalar cc (mensajería entre sesiones)
 ```
 
 obtenés **[lore](./plugins/lore/)** · extracción de sesiones a sqlite. costos, búsqueda, memoria de errores, detección de patrones. todos los datos se mantienen locales en `~/.claude/lore/lore.db`.
@@ -75,7 +75,7 @@ empezá con `lore` + el hook `safety-guard`. agregá más conforme avanzás. **[
 mensajería entre sesiones y el subsistema de `time`. mirá qué hacen otras sesiones de Claude Code, enviá mensajes entre ellas, y obtené estimaciones de tiempo realistas basadas en tu propio historial de sesiones.
 
 ```bash
-/plugin install cc@cc
+/plugin install cc@claude-code-tips
 ```
 
 ```
