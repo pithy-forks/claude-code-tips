@@ -656,31 +656,78 @@ function computeDigest(opts: { since_ms?: number | null }): Digest {
 
 // --- MCP tool definition ---
 
-const tool = {
-  name: "cc",
-  description:
-    "Claude Code session mesh (email-cc semantics). Verb-dispatched via 'action'. Other sessions on this machine stay informed of what you are doing; you see theirs. Prevents redundant work via file-overlap alerts.",
-  inputSchema: {
-    type: "object" as const,
-    properties: {
-      action: {
-        type: "string",
-        enum: ["sessions", "send", "announce", "check", "cleanup"],
-        description:
-          "sessions: list live peers; send: DM a peer (resolve by short id, full id, or cwd basename); announce: broadcast status to peers; check: pull awareness digest; cleanup: terminate this session's row (called automatically on shutdown -- safe to omit).",
+// v3 tool surface: 5 typed tools instead of one verb-dispatched 'cc' tool.
+// Aligns with the imessage plugin's per-tool layout. Each tool's
+// inputSchema only includes its own args, so the LLM's tool-selection
+// step picks the right shape automatically. Names are prefixed with
+// 'cc_' to keep the namespace tidy in /tools/list.
+const tools = [
+  {
+    name: "cc_sessions",
+    description:
+      "List live Claude Code sessions on this machine (peers in the cc mesh). Returns id, short_id (first 8 chars), cwd_basename, cwd, recent_files, and last_seen_s for each. Pass include_self=true to see your own row.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        include_self: { type: "boolean", description: "include your own session in the result (default false)" },
       },
-      include_self: { type: "boolean", description: "sessions: include this session in the list" },
-      to: { type: "string", description: "send: target peer (short id, full session id, or cwd basename)" },
-      message: { type: "string", description: "send: body" },
-      subject: { type: "string", description: "send: optional one-line subject" },
-      urgency: { type: "string", enum: ["low", "normal", "urgent", "question"], description: "send: priority hint, default normal" },
-      meta: { type: "object", description: "send: optional structured metadata" },
-      summary: { type: "string", description: "announce: one-line status" },
-      detail: { type: "string", description: "announce: optional longer body" },
-      since_s: { type: "number", description: "check: lookback window in seconds, default = since last check" },
     },
-    required: ["action"],
   },
+  {
+    name: "cc_send",
+    description:
+      "Direct-message a peer Claude Code session. Pass 'to' as the peer's short id (8 hex chars), full session id, or cwd basename. The recipient sees your message in their next awareness digest (or as a channel push notification mid-turn). Use urgency='question' if you need a reply.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        to: { type: "string", description: "target peer (short id, full session id, or cwd basename)" },
+        message: { type: "string", description: "message body" },
+        subject: { type: "string", description: "optional one-line subject" },
+        urgency: { type: "string", enum: ["low", "normal", "urgent", "question"], description: "priority hint, default normal" },
+        meta: { type: "object", description: "optional structured metadata (peers can read this)" },
+      },
+      required: ["to", "message"],
+    },
+  },
+  {
+    name: "cc_announce",
+    description:
+      "Broadcast a status update visible to all live peers via their next awareness digest. Use for 'I'm starting work on auth.ts' style coordination signals. No reply expected.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        summary: { type: "string", description: "one-line status (required)" },
+        detail: { type: "string", description: "optional longer body" },
+      },
+      required: ["summary"],
+    },
+  },
+  {
+    name: "cc_check",
+    description:
+      "Pull the cc awareness digest: peers' recent files, file-overlap alerts, direct messages, and announcements. Auto-deltas (only items since your last check) unless you pass since_s. Channel push notifications cover the realtime case; this verb is for explicit polling.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        since_s: { type: "number", description: "lookback window in seconds; default = since last check" },
+      },
+    },
+  },
+  {
+    name: "cc_cleanup",
+    description:
+      "Mark this session's row as ended (cleanup runs automatically on shutdown; this is for explicit early teardown). Safe to omit -- the shutdown handler covers normal exit.",
+    inputSchema: { type: "object" as const, properties: {} },
+  },
+];
+
+// Map tool name to action key in ArgsByAction (for the dispatch wrapper).
+const TOOL_TO_ACTION: Record<string, keyof typeof ArgsByAction> = {
+  cc_sessions: "sessions",
+  cc_send: "send",
+  cc_announce: "announce",
+  cc_check: "check",
+  cc_cleanup: "cleanup",
 };
 
 // `instructions` is read by Claude Code at MCP-connect time and shown to the
@@ -708,7 +755,7 @@ const server = new Server(
   },
 );
 
-server.setRequestHandler(ListToolsRequestSchema, async () => ({ tools: [tool] }));
+server.setRequestHandler(ListToolsRequestSchema, async () => ({ tools }));
 
 function text(s: string) {
   return { content: [{ type: "text" as const, text: s }] };
@@ -793,18 +840,32 @@ function assertNotChannelState(value: unknown, fieldHint: string): void {
 }
 
 server.setRequestHandler(CallToolRequestSchema, async (req) => {
-  if (req.params.name !== "cc") return errorText(`unknown tool: ${req.params.name}`);
-  const rawArgs = (req.params.arguments ?? {}) as Record<string, unknown>;
-  const action = String(rawArgs.action ?? "");
-
-  if (!(action in ArgsByAction)) {
+  // v3: tool name routes to action via TOOL_TO_ACTION. Old single-tool
+  // 'cc' name is also accepted (with the args.action field) for one
+  // release-cycle of backward compat -- emits a stderr warning so users
+  // notice. Remove in v3.1.
+  let action: keyof typeof ArgsByAction | null = null;
+  let rawArgs = (req.params.arguments ?? {}) as Record<string, unknown>;
+  if (req.params.name in TOOL_TO_ACTION) {
+    action = TOOL_TO_ACTION[req.params.name as keyof typeof TOOL_TO_ACTION];
+  } else if (req.params.name === "cc") {
+    process.stderr.write(
+      `cc: legacy verb-dispatch tool 'cc' is deprecated; use cc_${rawArgs.action ?? "*"} directly. (Will be removed in v3.1.)\n`,
+    );
+    const a = String(rawArgs.action ?? "");
+    if (a in ArgsByAction) {
+      action = a as keyof typeof ArgsByAction;
+      const { action: _, ...rest } = rawArgs;
+      rawArgs = rest;
+    }
+  }
+  if (action === null) {
     return errorText(
-      `cc: unknown action '${action}'. valid: ${Object.keys(ArgsByAction).join(", ")}`,
+      `unknown tool: ${req.params.name}. valid: ${tools.map((t) => t.name).join(", ")}`,
     );
   }
-  const schema = ArgsByAction[action as keyof typeof ArgsByAction];
-  const { action: _, ...rest } = rawArgs;
-  const parsed = schema.safeParse(rest);
+  const schema = ArgsByAction[action];
+  const parsed = schema.safeParse(rawArgs);
   if (!parsed.success) {
     return errorText(
       `cc.${action}: ${parsed.error.issues.map((i) => i.message).join("; ")}`,
@@ -812,7 +873,7 @@ server.setRequestHandler(CallToolRequestSchema, async (req) => {
   }
   const args = parsed.data as Record<string, unknown>;
 
-  // Re-cast to keep the legacy verb bodies' code shape (they read off
+  // Re-cast to keep the existing verb bodies' code shape (they read off
   // 'args.<field>' as unknown). Zod has already validated each field's type.
   for (const [k, v] of Object.entries(args)) {
     (rawArgs as Record<string, unknown>)[k] = v;
