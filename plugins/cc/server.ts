@@ -73,8 +73,90 @@ const TOPICS_DIR = path.join(CC_DIR, "topics");
 const QUESTIONS_DIR = path.join(CC_DIR, "questions");
 const DB_PATH = path.join(CC_DIR, "sessions.db");
 
-const MY_SESSION_ID = process.env.CLAUDE_SESSION_ID || "";
-const MY_CWD = process.cwd();
+// --- session identity resolution -------------------------------------------
+// CC v2.1.121 does not pass CLAUDE_SESSION_ID to MCP child processes (verified
+// 2026-04-28: env passed includes CLAUDE_PLUGIN_DATA, CLAUDE_CODE_*, but not
+// CLAUDE_SESSION_ID). However CC writes a per-pid metadata file to
+// ~/.claude/sessions/<pid>.json containing { sessionId, cwd, kind, ... } for
+// every interactive CC process. We resolve identity by walking up the parent
+// process chain looking for a pid whose session file exists.
+//
+// Why walk up: the MCP child's direct ppid is usually a shell or the bun
+// runner, not the CC parent. The CC process is one or two levels further up.
+// Stop at depth 8 to avoid infinite loops on weird process trees.
+//
+// Fallback: if the walk fails (orphaned process, non-interactive entrypoint,
+// or session file ENOENT), generate a UUID4 so the server can still register
+// itself. Marked with `kind: "synthetic"` in the row so we know it's not a
+// real CC session.
+import { execSync, spawnSync } from "node:child_process";
+
+type ResolvedIdentity = {
+  sessionId: string;
+  cwd: string;
+  kind: string;
+};
+
+function readSessionFile(pid: number): ResolvedIdentity | null {
+  const p = path.join(CLAUDE_DIR, "sessions", `${pid}.json`);
+  if (!fs.existsSync(p)) return null;
+  try {
+    const raw = JSON.parse(fs.readFileSync(p, "utf-8")) as {
+      sessionId?: string;
+      cwd?: string;
+      kind?: string;
+    };
+    if (!raw.sessionId) return null;
+    return {
+      sessionId: raw.sessionId,
+      cwd: raw.cwd || process.cwd(),
+      kind: raw.kind || "interactive",
+    };
+  } catch {
+    return null;
+  }
+}
+
+function getParentPid(pid: number): number | null {
+  try {
+    const out = execSync(`ps -o ppid= -p ${pid}`, { encoding: "utf-8", timeout: 1000 });
+    const ppid = parseInt(out.trim(), 10);
+    return Number.isFinite(ppid) && ppid > 0 ? ppid : null;
+  } catch {
+    return null;
+  }
+}
+
+function resolveIdentity(): ResolvedIdentity {
+  // 1. Honor explicit env override (rare, but tests + future CC versions may set it).
+  const envId = process.env.CLAUDE_SESSION_ID;
+  if (envId) {
+    return { sessionId: envId, cwd: process.cwd(), kind: "env" };
+  }
+  // 2. Walk parent chain up to 8 hops; first ancestor with a CC session file wins.
+  let pid: number | null = process.pid;
+  for (let depth = 0; depth < 8 && pid !== null; depth++) {
+    const ident = readSessionFile(pid);
+    if (ident) {
+      process.stderr.write(
+        `cc: identity resolved via /.claude/sessions/${pid}.json (depth ${depth}, sid ${ident.sessionId.slice(0, 8)}, cwd ${ident.cwd})\n`,
+      );
+      return ident;
+    }
+    pid = getParentPid(pid);
+  }
+  // 3. Synthetic fallback. Better to register a row with a fresh id than be invisible.
+  const synthetic = `synthetic-${randomBytes(8).toString("hex")}`;
+  process.stderr.write(
+    `cc: WARNING -- no parent CC session file found; using synthetic id ${synthetic.slice(0, 16)}. The mesh will not see this session as a 'real' peer of any other CC instance.\n`,
+  );
+  return { sessionId: synthetic, cwd: process.cwd(), kind: "synthetic" };
+}
+
+const MY_IDENTITY = resolveIdentity();
+const MY_SESSION_ID = MY_IDENTITY.sessionId;
+const MY_CWD = MY_IDENTITY.cwd;
+const MY_KIND = MY_IDENTITY.kind;
 const MY_PID = process.pid;
 
 // --- env-driven config ---
@@ -127,7 +209,6 @@ const MY_CWD_BASENAME = path.basename(MY_CWD) || MY_SHORT_ID;
 // sessions.* and recent_files.* columns the file-overlap detector reads.
 // Caching for the 60s window between heartbeats means a branch switch
 // shows up to peers within ~30-60s, which is fine for awareness.
-import { spawnSync } from "node:child_process";
 
 type GitContext = {
   branch: string | null;
