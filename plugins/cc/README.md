@@ -132,14 +132,8 @@ plugins/cc/
 ├── lib/
 │   ├── render.ts                   Digest → additionalContext text
 │   └── transcript-tail.ts          watches own transcript, publishes recent_files
-├── hooks/
-│   ├── hooks.json                  3 mcp_tool hooks (SessionStart, UserPromptSubmit, SessionEnd)
-│   └── time-project-hint.sh        SessionStart project-timing hint (time subsystem)
-├── commands/sessions.md            /cc:sessions slash command
-├── rules/time.md                   time budgeting rule
-├── skills/time-estimate/           model-callable only (user-invocable: false)
-├── skills/time-calibrate/          model-callable only (user-invocable: false)
-└── skills/time-benchmark/          model-callable only (user-invocable: false)
+├── hooks/hooks.json                3 mcp_tool hooks (SessionStart, UserPromptSubmit, SessionEnd)
+└── commands/sessions.md            /cc:sessions slash command
 ```
 
 state at `${CLAUDE_CONFIG_DIR:-~/.claude}/cc/`:
@@ -173,24 +167,52 @@ sessions converge safely.
 - **sqlite database corrupted:** remove `${CLAUDE_CONFIG_DIR:-~/.claude}/cc/sessions.db*`
   and restart any session; schema is recreated.
 
-## time subsystem
+## upgrading from cc 2.x
 
-cc also hosts the `time` subsystem introduced in v1.1.0 (unchanged):
-
-- `rules/time.md`: cc-time budgeting rule (bimodal modes, model × effort matrix, 3 tiers of parallelism)
-- `hooks/time-project-hint.sh`: `SessionStart` project-scoped timing hint, reads `~/.claude/mine.db` if present
-- `/cc:time-estimate <task>`: produces a ranged estimate with effort-rung cited
-- `/cc:time-calibrate`: diffs your real throughput (needs `mine` plugin)
-- `/cc:time-benchmark`: A/B/C across `/effort low`/`medium`/`high` on your current model
-
-skills are namespaced under `cc:`. claude code will accept the bare form (`/time-estimate`) when no other plugin registers the same name; the namespaced form is the canonical one.
-
-see `rules/time.md` for the full matrix and estimation format.
-
-## rollback
+if you used `/cc:time-estimate`, `/cc:time-calibrate`, `/cc:time-benchmark`, or the SessionStart project-timing hint, those moved out of cc into a focused `time` plugin in this same marketplace. install it with:
 
 ```
-/plugin uninstall cc
+/plugin install time@cc
 ```
 
-no user-settings changes to reverse.
+cc 3.0 is **session mesh, period.** email-cc semantics for agents.
+
+## uninstall / rollback
+
+`/plugin uninstall cc` only flips the plugin's `enabledPlugins` flag in
+`settings.local.json`. The runtime data at `~/.claude/cc/` (sqlite DB,
+inbox, topics, questions) is left in place, and the marketplace cache
+under `~/.claude/plugins/cache/cc/cc/` lingers. For most users that's
+fine — reinstalling later picks up where you left off.
+
+For a true clean slate, run the cascade-uninstall script that ships
+with the plugin:
+
+```bash
+bash "$CLAUDE_PLUGIN_ROOT/bin/uninstall.sh"
+```
+
+(or, if `$CLAUDE_PLUGIN_ROOT` isn't set in your shell, point it at the
+plugin source directly: `bash plugins/cc/bin/uninstall.sh`)
+
+The script:
+
+1. stops any running `cc-server` child processes (compiled binary or
+   bun-source forms),
+2. wipes `~/.claude/cc/` (`--keep-data` to preserve it),
+3. removes the cc version cache under `~/.claude/plugins/cache/cc/cc/`,
+4. removes `cc@cc` from `enabledPlugins` in `settings.local.json`.
+
+> **Important: restart Claude Code afterwards.** If you run the script
+> from inside a CC session that has the cc plugin loaded, the parent CC
+> process will respawn the MCP child on the next hook fire and
+> recreate `~/.claude/cc/`. The script prints a warning when it detects
+> this. For a true reset: run the script, then quit and relaunch CC.
+
+To reinstall fresh:
+
+```
+/plugin install cc@cc
+```
+
+The script is idempotent and safe to run multiple times.

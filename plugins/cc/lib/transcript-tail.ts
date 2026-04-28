@@ -62,16 +62,25 @@ export function startTranscriptTail(opts: {
   sessionId: string;
   cwd: string;
   maxPaths?: number;
+  // Returns the *current* branch + worktree at the moment a file is touched.
+  // Server.ts refreshes its myGitContext on every heartbeat; this getter
+  // closure reads that latest snapshot so a branch switch is reflected on
+  // the next touched file. Optional (for tests / non-git cwds).
+  gitContext?: () => { branch: string | null; worktree_root: string | null };
 }): () => void {
   const { db, sessionId, cwd } = opts;
   const maxPaths = opts.maxPaths ?? 10;
+  const gitContext = opts.gitContext ?? (() => ({ branch: null, worktree_root: null }));
   const file = findTranscriptFile(sessionId, cwd);
   if (!file) return () => {};
 
   const upsert = db.prepare(
-    `INSERT INTO recent_files (session_id, path, touched_at_ms)
-     VALUES (?, ?, ?)
-     ON CONFLICT(session_id, path) DO UPDATE SET touched_at_ms = excluded.touched_at_ms`,
+    `INSERT INTO recent_files (session_id, path, branch, worktree_root, touched_at_ms)
+     VALUES (?, ?, ?, ?, ?)
+     ON CONFLICT(session_id, path) DO UPDATE SET
+       branch = excluded.branch,
+       worktree_root = excluded.worktree_root,
+       touched_at_ms = excluded.touched_at_ms`,
   );
   const trim = db.prepare(
     `DELETE FROM recent_files
@@ -140,8 +149,11 @@ export function startTranscriptTail(opts: {
       }
       if (paths.size > 0) {
         const now = Date.now();
+        const ctx = gitContext();
         const tx = db.transaction((arr: string[]) => {
-          for (const p of arr) upsert.run(sessionId, p, now);
+          for (const p of arr) {
+            upsert.run(sessionId, p, ctx.branch, ctx.worktree_root, now);
+          }
           trim.run(sessionId, sessionId, maxPaths);
         });
         tx([...paths]);

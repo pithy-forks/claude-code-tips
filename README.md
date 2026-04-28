@@ -16,7 +16,7 @@ new here? start with the [tips index](./docs/tips/) or skim [hooks](./docs/hooks
 
 three plugins, one marketplace.
 
-- **`mine@cc`** every session mined into sqlite. query costs, tools, errors, hotspots, loops, and full-text search across your own history. everything local.
+- **`lore@cc`** every session mined into sqlite. query costs, tools, errors, hotspots, loops, and full-text search across your own history. everything local.
 - **`cc@cc`** cross-session awareness and messaging. plus a `time` subsystem: `/cc:time-estimate` gives realistic claude-code time grounded in your session history, not optimistic guesses.
 - **`fuel@cc`** 3-meter fuel gauge (5-hour session, 7-day weekly, 200k context). pre-turn hook nudges claude toward cleaner handoffs as the meters fill. `/fuel state` reads them directly; `/fuel handoff` drafts a stopping point.
 
@@ -30,7 +30,7 @@ your time: ~15 min review
 
 ```bash
 /plugin marketplace add anipotts/claude-code-tips   # add marketplace (one time)
-/plugin install mine@cc                             # install mine (session analytics)
+/plugin install lore@cc                             # install lore (session analytics)
 /plugin install cc@cc                               # install cc (cross-session messaging)
 ```
 
@@ -48,25 +48,25 @@ same usage would cost ~$12K on the API with caching, ~$95K without. no autonomou
 
 ---
 
-## install the mine plugin
+## install the lore plugin
 
 ```bash
 /plugin marketplace add anipotts/claude-code-tips   # add marketplace (one time)
-/plugin install mine@cc                             # install mine (session analytics)
+/plugin install lore@cc                             # install lore (session analytics)
 /plugin install cc@cc                               # install cc (cross-session messaging)
 ```
 
-you get **[mine](./plugins/mine/)** · session mining to sqlite. costs, search, error memory, pattern detection. all data stays local at `~/.claude/mine.db`.
+you get **[lore](./plugins/lore/)** · session mining to sqlite. costs, search, error memory, pattern detection. all data stays local at `~/.claude/lore/lore.db`.
 
 ```
-/mine                     today's sessions, cost, top tools
-/mine search "websocket"  full-text search across all conversations
-/mine mistakes            error patterns claude keeps repeating
-/mine hotspots            most-edited files across sessions
-/mine loops               repeated patterns across sessions
+/lore                     today's sessions, cost, top tools
+/lore search "websocket"  full-text search across all conversations
+/lore mistakes            error patterns claude keeps repeating
+/lore hotspots            most-edited files across sessions
+/lore loops               repeated patterns across sessions
 ```
 
-start with `mine` + the `safety-guard` hook. add more as you go. **[mine docs &rarr;](./plugins/mine/)**
+start with `lore` + the `safety-guard` hook. add more as you go. **[lore docs &rarr;](./plugins/lore/)**
 
 ---
 
@@ -82,7 +82,7 @@ cross-session messaging and the `time` subsystem. see what other claude code ses
 /cc                             show active sessions
 /cc send merizo "pause"         message another session
 /cc:time-estimate <task>        ranged CC estimate, uses your current model + effort
-/cc:time-calibrate              diff real throughput (from mine.db) against the rule
+/cc:time-calibrate              diff real throughput (from lore.db) against the rule
 /cc:time-benchmark              guided A/B/C across effort levels on your model
 ```
 
@@ -172,7 +172,7 @@ copy to `.claude/agents/` and invoke with `/agent <name>`. each teaches a differ
 
 | command | what it does |
 |---|---|
-| `/mine` | usage data · costs, sessions, search, patterns |
+| `/lore` | usage data · costs, sessions, search, patterns |
 | `/ship` | stage, commit, push, open PR in one command |
 | `/improve` | propose CLAUDE.md updates from git history |
 
@@ -225,7 +225,7 @@ this repo runs on its own patterns.
 
 these all came out of living in claude code every day. each solves a specific problem i kept hitting.
 
-- **[mine](./plugins/mine/)** · session mining to sqlite. costs, search, error memory, pattern detection
+- **[lore](./plugins/lore/)** · session mining to sqlite. costs, search, error memory, pattern detection
 - **[claudemon](https://github.com/anipotts/claudemon)** · real-time session monitoring across projects and machines
 - **[cc](./plugins/cc/)** · multi-session awareness. see what other sessions are doing, send messages between them
 - **[imessage-mcp](https://github.com/anipotts/imessage-mcp)** · MCP server for read-only iMessage history. 26 tools, zero network requests
