@@ -107,9 +107,13 @@ describe("ActionSchema (zod source of truth)", () => {
 });
 
 describe("ACTION_JSON_SCHEMA (model-facing)", () => {
-  it("is an anyOf of one branch per action", () => {
-    expect(ACTION_JSON_SCHEMA.anyOf).toBeDefined();
-    expect((ACTION_JSON_SCHEMA.anyOf as unknown[]).length).toBe(4);
+  it("is a oneOf of one branch per action", () => {
+    expect(ACTION_JSON_SCHEMA.oneOf).toBeDefined();
+    expect((ACTION_JSON_SCHEMA.oneOf as unknown[]).length).toBe(4);
+  });
+
+  it("does not include anyOf (post-processed to oneOf)", () => {
+    expect(ACTION_JSON_SCHEMA.anyOf).toBeUndefined();
   });
 
   it("does not include $schema (cleaner bytes for prompt cache)", () => {
@@ -126,7 +130,7 @@ describe("ACTION_JSON_SCHEMA (model-facing)", () => {
   });
 
   it("each branch enforces its action discriminator as const", () => {
-    for (const branch of ACTION_JSON_SCHEMA.anyOf as Array<Record<string, unknown>>) {
+    for (const branch of ACTION_JSON_SCHEMA.oneOf as Array<Record<string, unknown>>) {
       const props = branch.properties as Record<string, { const?: string }>;
       expect(props.action.const).toBeDefined();
       expect(typeof props.action.const).toBe("string");
