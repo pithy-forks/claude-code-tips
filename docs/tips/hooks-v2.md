@@ -14,7 +14,22 @@ hooks come in five flavors now (v2.1.118 added `mcp_tool`). pick the wrong one a
 | `agent` | subagent with full tool access (Read, Grep, Glob) | 60s | expensive | complex decisions that need file reads |
 | `mcp_tool` (v2.1.118) | directly invoke an MCP tool on a connected server | 60s | free (no child process) | hook work that an MCP server already owns the state for |
 
-`command` handles 90%+ of cases. it's the fastest, cheapest, and most predictable. `mcp_tool` is the newest: when your plugin already ships an MCP server with tools, hooks can call those tools directly without a shell shim.
+### updatedToolOutput (PostToolUse, v2.1.121+)
+
+PostToolUse hooks can now replace tool output before claude sees it. return `{"hookSpecificOutput": {"PostToolUse": {"updatedToolOutput": "your replacement text"}}}` to modify what claude receives from the tool.
+
+use case: filter sensitive output (API keys, internal IPs), normalize error messages, add context. example: a bash hook that catches test failures and appends a link to the failing test file in your CI dashboard.
+
+```json
+{
+  "type": "command",
+  "command": "~/.claude/hooks/test-failure-context.sh",
+  "events": ["PostToolUse"],
+  "matcher": "Bash"
+}
+```
+
+the script receives the tool result as `tool_result.content[0].text` in the stdin JSON. output the modified text and exit 0. claude sees your version, not the original.
 
 ### command
 

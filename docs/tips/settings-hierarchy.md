@@ -14,6 +14,20 @@ claude code reads settings from three levels. knowing which to use where saves y
 
 they merge in that order. local overrides project overrides global.
 
+
+
+### migration note: ~/.claude.json → settings.json (v2.1.119+)
+
+starting v2.1.119, display settings moved from `~/.claude.json` to the settings.json scope:
+
+- `autoScrollEnabled`
+- `editorMode`
+- `showTurnDuration`
+- `teammateMode`
+- `terminalProgressBarEnabled`
+
+if you have `~/.claude.json`, these settings still work but are deprecated. migrate them to `~/.claude/settings.json` under a new `display` key. the migration is one-time: check your old config, copy relevant keys, delete the deprecated file.
+
 ## when to use which
 
 | setting | where | why |
@@ -23,6 +37,25 @@ they merge in that order. local overrides project overrides global.
 | personal hooks (panopticon, notify) | local | your workflow, not the team's |
 | permission overrides | local | never commit permission bypasses |
 | API keys in env | local | never commit secrets |
+
+
+
+### new in v2.1.121: status line input fields
+
+two new display settings control what appears in the input status line:
+
+- `effort.level` -- shows current effort setting (low/medium/high/xhigh/max)
+- `thinking.enabled` -- shows whether extended thinking is active
+
+add to your `~/.claude/settings.json` if you want these fields visible:
+
+```json
+{
+  "display": {
+    "statusLineInputFields": ["effort.level", "thinking.enabled"]
+  }
+}
+```
 
 ## the rule
 
