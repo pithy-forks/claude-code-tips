@@ -31,6 +31,23 @@ use case: filter sensitive output (API keys, internal IPs), normalize error mess
 
 the script receives the tool result as `tool_result.content[0].text` in the stdin JSON. output the modified text and exit 0. claude sees your version, not the original.
 
+
+
+### mcp_tool event hooks (v2.1.126+)
+
+MCP tool handlers can now be invoked from hooks using the `mcp_tool` type. this lets you intercept and react to MCP calls without spinning up a shell or http process:
+
+```json
+{
+  "type": "mcp_tool",
+  "server": "database",
+  "tool": "query_audit",
+  "input": { "table": "users", "limit": 10 }
+}
+```
+
+use case: a PreToolUse hook that calls an MCP audit tool to log sensitive queries before they execute. no shell overhead, no http latency.
+
 ### command
 
 the workhorse. runs a shell command, reads JSON from stdin, returns exit 0 (allow) or exit 2 (block). every hook in this repo is a command hook.

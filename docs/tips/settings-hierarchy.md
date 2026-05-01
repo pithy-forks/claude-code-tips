@@ -28,6 +28,12 @@ starting v2.1.119, display settings moved from `~/.claude.json` to the settings.
 
 if you have `~/.claude.json`, these settings still work but are deprecated. migrate them to `~/.claude/settings.json` under a new `display` key. the migration is one-time: check your old config, copy relevant keys, delete the deprecated file.
 
+
+
+### new in v2.1.126: provider-managed auth
+
+if you're using claude code through an embedding host platform (IDE plugin, platform integration), `CLAUDE_CODE_PROVIDER_MANAGED_BY_HOST` will be set by the host. when this env var is present, provider/auth settings in `.claude/settings.json` are ignored -- the host manages authentication instead. this prevents config conflicts between user settings and platform-managed auth.
+
 ## when to use which
 
 | setting | where | why |
@@ -56,6 +62,22 @@ add to your `~/.claude/settings.json` if you want these fields visible:
   }
 }
 ```
+
+
+
+### new in v2.1.126: notification channel control
+
+add `preferredNotifChannel` to your `~/.claude/settings.json` display settings to control where task-complete and permission notifications appear:
+
+```json
+{
+  "display": {
+    "preferredNotifChannel": "auto"
+  }
+}
+```
+
+valid values: `auto` (desktop in iTerm2/Ghostty/Kitty, fallback to stdout), `desktop`, `stdout`, `none`. default is `auto`, which detects your terminal and uses desktop notifications if available.
 
 ## the rule
 

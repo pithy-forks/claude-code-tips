@@ -65,6 +65,17 @@ every claude code interaction is an API call. you send tokens in (prompt + conve
 
 ---
 
+
+
+### bedrock and service tiers (v2.1.122+)
+
+if you're using anthropic bedrock, set `ANTHROPIC_BEDROCK_SERVICE_TIER` to control priority:
+- `default` -- standard rate limits
+- `flex` -- flexible capacity, lower cost
+- `priority` -- guaranteed capacity, higher cost
+
+this env var is sent as `X-Amzn-Bedrock-Service-Tier` header on all requests. on subscription plans, tier choice doesn't affect your monthly bill but does affect throughput and latency.
+
 ## model pricing (march 2026)
 
 | model | input (per M) | output (per M) | cache read | cache write |
