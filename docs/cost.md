@@ -78,13 +78,9 @@ this env var is sent as `X-Amzn-Bedrock-Service-Tier` header on all requests. on
 
 ## model pricing (march 2026)
 
-| model | input (per M) | output (per M) | cache read | cache write |
-|---|---|---|---|---|
-| haiku 4.5 | $1.00 | $5.00 | $0.10 | $1.25 |
-| sonnet 4.6 | $3.00 | $15.00 | $0.30 | $3.75 |
-| opus 4.6 | $5.00 | $25.00 | $0.50 | $6.25 |
+## model pricing (may 2026)
 
-> [current pricing](https://docs.anthropic.com/en/docs/about-claude/models) - last verified april 2026, may have changed. check official pricing for v2.1.120+ rates.
+> [current pricing](https://docs.anthropic.com/en/docs/about-claude/models) - last verified may 2026, may have changed. check official pricing for v2.1.122+ rates.
 
 ## what actually costs money
 
