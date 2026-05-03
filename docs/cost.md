@@ -201,3 +201,7 @@ i've never hit a rate limit on max. on pro, i'd have been throttled in the first
 - [lore plugin](../plugins/lore/) -- burn feature, cost tracking, usage analysis, knowledge graph
 - [agents](./agents.md) -- cost considerations for agent teams
 - [official pricing](https://docs.anthropic.com/en/docs/about-claude/models) -- current model pricing
+
+---
+
+> pricing last verified april 2026 against [official anthropic pricing](https://docs.anthropic.com/en/docs/about-claude/models). rates may have changed since publication. run `claude --version` to confirm your installed version.
