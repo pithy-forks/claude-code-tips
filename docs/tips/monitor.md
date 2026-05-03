@@ -1,4 +1,4 @@
-<!-- tested with: claude code v2.1.98 -->
+<!-- tested with: claude code v2.1.122 -->
 
 # monitor
 

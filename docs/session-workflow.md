@@ -44,15 +44,6 @@ from real data: 32% of 30-60 min sessions needed compaction, 54% of 2hr+ session
 
 the data says: sessions that hit compaction average 1.7 compactions. if you're compacting more than twice, the session is too long -- split it.
 
-<!-- /clear when: -->
-<!-- - switching to a completely different task -->
-<!-- - claude is stuck in a loop and retrying the same approach -->
-<!-- - you want a fresh start with no baggage -->
-<!-- -->
-<!-- never /compact when: -->
-<!-- - you have uncommitted changes that aren't captured in handoff -->
-<!-- - you're about to switch branches ] -->
-
 ## ending a session
 
 when a session ends (ctrl+c, `/exit`, or timeout), two things fire:

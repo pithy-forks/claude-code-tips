@@ -1,3 +1,5 @@
+<!-- tested with: claude code v2.1.122 -->
+
 # lore v2 - observability as a service
 
 Status: draft - v3 horizon
