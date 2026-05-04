@@ -82,6 +82,10 @@ this env var is sent as `X-Amzn-Bedrock-Service-Tier` header on all requests. on
 
 > [current pricing](https://docs.anthropic.com/en/docs/about-claude/models) - last verified may 2026, may have changed. check official pricing for v2.1.122+ rates.
 
+## model pricing (may 2026)
+
+> [current pricing](https://docs.anthropic.com/en/docs/about-claude/models) - last verified may 2026, may have changed. check official pricing for v2.1.122+ rates.
+
 ## what actually costs money
 
 ranked by impact:

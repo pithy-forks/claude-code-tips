@@ -18,6 +18,10 @@
 
 ---
 
+
+
+> note: antigravity pricing marked as TBD. verify current status at antigravity.google/pricing before recommending to users.
+
 ## what each tier actually includes
 
 ### free tiers

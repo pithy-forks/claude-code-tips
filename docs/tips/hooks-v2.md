@@ -33,6 +33,22 @@ the script receives the tool result as `tool_result.content[0].text` in the stdi
 
 
 
+
+
+example: filter API keys and internal IPs from bash output:
+
+```bash
+#!/usr/bin/env bash
+set -euo pipefail
+INPUT=$(cat)
+OUTPUT=$(echo "$INPUT" | jq -r '.tool_result.content[0].text // empty')
+
+# redact sensitive patterns
+REDACTED=$(echo "$OUTPUT" | sed -E 's/(api[_-]?key|authorization)[:=] *[^ ]+/\1: [REDACTED]/gi')
+
+echo "{\"hookSpecificOutput\": {\"PostToolUse\": {\"updatedToolOutput\": \"$REDACTED\"}}}"
+```
+
 ### mcp_tool event hooks (v2.1.126+)
 
 MCP tool handlers can now be invoked from hooks using the `mcp_tool` type. this lets you intercept and react to MCP calls without spinning up a shell or http process:
