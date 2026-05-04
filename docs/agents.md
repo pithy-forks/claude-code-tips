@@ -55,6 +55,16 @@ spawn all three at once. when they return, you have the full picture without hav
 
 ---
 
+
+
+## appendix: agent collections and frameworks
+
+open-source collections of pre-built agent configurations and team templates:
+- [msitarzewski/agency-agents](https://github.com/msitarzewski/agency-agents) -- curated agent patterns and workflows
+- [VoltAgent/awesome-claude-code-subagents](https://github.com/VoltAgent/awesome-claude-code-subagents) -- community agent pack library (10k+ stars)
+
+use these as templates for your own agent teams. many patterns (scout, specialist delegation, parallel research) have published implementations you can fork and adapt.
+
 ## pattern 2: specialist delegation
 
 instead of doing everything in one context window, delegate specific work to agents with a single job.

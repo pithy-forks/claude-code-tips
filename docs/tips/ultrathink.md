@@ -38,6 +38,10 @@ current setup is in src/auth/. don't break existing JWT flows.
 
 claude code's extended thinking allocates more compute to reasoning before generating a response. the model "thinks out loud" internally, exploring multiple approaches before committing to one. you don't see the thinking tokens but you benefit from the better output.
 
+
+
+note: ultrathink triggers extended thinking in claude's reasoning chain. temperature=0 (deterministic mode) still applies -- ultrathink and determinism are orthogonal. multiple calls with identical prompts and ultrathink enabled may produce different reasoning paths even at temperature=0.
+
 ## try it
 
 next time you're about to ask claude for something complex, prefix it with "ultrathink" and compare the quality of the plan. you'll notice it considers more edge cases and catches tradeoffs you didn't mention.
