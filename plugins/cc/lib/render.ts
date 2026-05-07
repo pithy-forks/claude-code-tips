@@ -30,6 +30,15 @@ export type SessionDigest = {
   // but cc's MCP server isn't up in that terminal yet (typical on the first
   // install before the user reloads other terminals).
   cc_loaded?: boolean;
+  // v3.4: peer intent summary fields. branch is the peer's current git
+  // branch (null on native-only peers). summary is a one-line synthesis
+  // (latest <30min announcement, else most-recent-touched-file basename,
+  // else "(idle)"). last_edit_age_s + last_announce_age_s let the renderer
+  // pick the freshest signal for the parenthetical age.
+  branch?: string | null;
+  summary?: string | null;
+  last_edit_age_s?: number | null;
+  last_announce_age_s?: number | null;
 };
 
 export type OverlapAlert = {
@@ -139,13 +148,22 @@ export function renderDigest(d: Digest): string {
         : "activity:",
     );
     for (const s of d.session_digests) {
-      const files = s.recent_files.slice(0, 3).map((f) => shortPath(f)).join(", ");
-      const filesStr = files ? ` (${files})` : "";
-      const announce = s.last_announce
-        ? `: ${previewOf(s.last_announce.summary, 160)} [${formatAge(s.last_announce.age_s)}]`
-        : "";
       const marker = s.cc_loaded === false ? " [no cc]" : "";
-      lines.push(`- ${s.session} @ ${shortPath(s.cwd)}${marker}${filesStr}${announce}`);
+      // v3.4 intent line: prefer the synthesized peer summary + freshest age.
+      // Falls back to the v3.3 cwd-only line for native-only peers, since
+      // they have no cc-side activity to summarize.
+      if (s.cc_loaded !== false && s.summary) {
+        // pick freshest age: announce age if announce drove the summary, else edit age
+        const driverAge =
+          s.last_announce_age_s != null && s.last_announce_age_s < 30 * 60
+            ? s.last_announce_age_s
+            : s.last_edit_age_s ?? null;
+        const ageStr = driverAge != null ? ` (${formatAge(driverAge)} ago)` : "";
+        const branchStr = s.branch ? ` ${s.branch}` : "";
+        lines.push(`- ${s.session}${branchStr} · ${previewOf(s.summary, 100)}${ageStr}`);
+      } else {
+        lines.push(`- ${s.session} @ ${shortPath(s.cwd)}${marker}`);
+      }
     }
   }
 

@@ -67,6 +67,13 @@ coordination (e.g. "I'm about to push to the same branch you're rebasing").
   message before continuing edits on a flagged file — that's the protocol.
 - **Announcements** are fire-and-forget broadcasts; peers see them in their
   next digest. No reply expected.
+- **`digest_delta` rides every cc call** (v3.3+). When the peer-visible
+  state has changed since this session's last cc call, the response from
+  `sessions` / `send` / `announce` includes a `digest_delta` block with
+  new announcements, edited files, peer joins, peer leaves. You don't
+  have to call `check` to discover this — it surfaces wherever you happen
+  to be calling cc. Once observed, the delta is consumed; the next call
+  shows only changes after that point.
 
 ## Examples
 
