@@ -63,14 +63,19 @@ export function startTranscriptTail(opts: {
   cwd: string;
   maxPaths?: number;
   // Returns the *current* branch + worktree at the moment a file is touched.
-  // Server.ts refreshes its myGitContext on every heartbeat; this getter
-  // closure reads that latest snapshot so a branch switch is reflected on
-  // the next touched file. Optional (for tests / non-git cwds).
+  // The getter closure reads server.ts's myGitContext snapshot, refreshed
+  // lazily inside onActivity (~60s TTL), so a branch switch is reflected on
+  // the next file touched after the refresh window. Optional (for tests).
   gitContext?: () => { branch: string | null; worktree_root: string | null };
+  // Fired once per readDelta that produced new path entries. Callers use this
+  // to lazily refresh sessions.last_seen + git context (replaces the v3 30s
+  // heartbeat timer). Optional so tests can omit it.
+  onActivity?: () => void;
 }): () => void {
   const { db, sessionId, cwd } = opts;
   const maxPaths = opts.maxPaths ?? 10;
   const gitContext = opts.gitContext ?? (() => ({ branch: null, worktree_root: null }));
+  const onActivity = opts.onActivity;
   const file = findTranscriptFile(sessionId, cwd);
   if (!file) return () => {};
 
@@ -148,6 +153,9 @@ export function startTranscriptTail(opts: {
         }
       }
       if (paths.size > 0) {
+        // Fire activity callback FIRST: callers refresh git context (TTL-gated)
+        // so the upsert below picks up branch changes inside this same delta.
+        onActivity?.();
         const now = Date.now();
         const ctx = gitContext();
         const tx = db.transaction((arr: string[]) => {
