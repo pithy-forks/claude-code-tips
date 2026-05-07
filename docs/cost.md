@@ -205,3 +205,9 @@ i've never hit a rate limit on max. on pro, i'd have been throttled in the first
 ---
 
 > pricing last verified april 2026 against [official anthropic pricing](https://docs.anthropic.com/en/docs/about-claude/models). rates may have changed since publication. run `claude --version` to confirm your installed version.
+
+---
+
+### session resumption improvements (v2.1.132+)
+
+v2.1.132 fixed `--resume` failing when emoji splits in tool error truncation and now sanitizes pre-corrupted sessions on load. this means longer sessions with more tool errors are now more reliable to resume, reducing context loss on recovery.

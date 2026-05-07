@@ -12,7 +12,17 @@ hooks come in five flavors now (v2.1.118 added `mcp_tool`). pick the wrong one a
 | `http` | POST to a URL, JSON body | 30s | free | external services, webhooks, metrics |
 | `prompt` | single-turn LLM eval | 30s | tokens | nuanced decisions, context-aware checks |
 | `agent` | subagent with full tool access (Read, Grep, Glob) | 60s | expensive | complex decisions that need file reads |
-| `mcp_tool` (v2.1.118) | directly invoke an MCP tool on a connected server | 60s | free (no child process) | hook work that an MCP server already owns the state for |
+| `mcp_tool` (v2.1.118+) | directly invoke an MCP tool on a connected server | 60s | free (no child process) | hook work that an MCP server already owns the state for |
+
+### updatedToolOutput (PostToolUse, v2.1.121+)
+
+PostToolUse hooks can now replace tool output before claude sees it. return `{"hookSpecificOutput": {"PostToolUse": {"updatedToolOutput": "your replacement text"}}}` to modify what claude receives from the tool.
+
+use case: filter sensitive output (API keys, internal IPs), normalize error messages, add context. example: a bash hook that catches test failures and appends a link to the failing test file in your CI dashboard.
+
+### mcp_tool event hooks (v2.1.126+)
+
+MCP tool handlers can now be invoked from hooks using the `mcp_tool` type with event-driven logic. this lets you intercept and react to MCP calls without spinning up a shell or http process.
 
 ### updatedToolOutput (PostToolUse, v2.1.121+)
 
@@ -76,6 +86,18 @@ the workhorse. runs a shell command, reads JSON from stdin, returns exit 0 (allo
 ```
 
 performance target: under 50ms for PreToolUse hooks. these fire on every single tool call. a slow command hook adds latency to everything.
+
+
+
+### accessing session ID in hooks
+
+v2.1.132 added `CLAUDE_CODE_SESSION_ID` environment variable to the Bash tool subprocess. hooks can now use this to correlate tool calls with sessions. set it in your hook scripts for logging or external service integration:
+
+```bash
+SESSION_ID=$(echo "$INPUT" | jq -r '.session_id // empty')
+# or from Bash subprocess env:
+echo "$CLAUDE_CODE_SESSION_ID"
+```
 
 ### http
 

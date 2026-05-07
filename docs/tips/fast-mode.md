@@ -27,3 +27,6 @@ fast mode doesn't change your cost on the max plan. you're paying $200/mo flat r
 hackathon. 30 minutes to demo. you need something that compiles, not something that's correct. that's the only time speed legitimately matters more than depth.
 
 [cost breakdown &rarr;](../cost.md)
+
+
+Note: v2.1.132 fixed an issue where `--permission-mode` flag was ignored when resuming a plan-mode session with `--continue`/`--resume`. if you use plan mode with fast mode in resumable workflows, verify your permission settings are preserved on resume.
