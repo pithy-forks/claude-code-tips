@@ -451,6 +451,10 @@ type LiveSessionRow = {
   // file exists). The install-trial UX needs both visible.
   cc_loaded: boolean;
   pid: number | null;
+  // v3.4: branch surfaces in the enriched digest "intent summary" line.
+  // Populated for cc-loaded peers from the sessions row; null for native-
+  // only peers (no cc-side resolver fired in their terminal yet).
+  branch: string | null;
 };
 
 type NativeSession = {
@@ -535,7 +539,7 @@ function liveSessions(): LiveSessionRow[] {
       return (
         db
           .prepare(
-            `SELECT id, name, cwd, role, last_seen_at_ms, started_at_ms, project_root, pid
+            `SELECT id, name, cwd, role, last_seen_at_ms, started_at_ms, project_root, pid, branch
              FROM sessions
              WHERE ended_at_ms IS NULL AND last_seen_at_ms > ?
              ORDER BY last_seen_at_ms DESC`,
@@ -548,7 +552,7 @@ function liveSessions(): LiveSessionRow[] {
     // Cross-reference native sessions with cc table by session_id.
     const ccRows = db
       .prepare(
-        `SELECT id, name, cwd, role, last_seen_at_ms, started_at_ms, project_root, pid
+        `SELECT id, name, cwd, role, last_seen_at_ms, started_at_ms, project_root, pid, branch
          FROM sessions
          WHERE ended_at_ms IS NULL`,
       )
@@ -569,7 +573,9 @@ function liveSessions(): LiveSessionRow[] {
       }
       // Native-only peer (cc plugin not wired in that terminal yet).
       // Synthesize a row from native data; derive project_root via cached
-      // git lookup so scope filtering still works.
+      // git lookup so scope filtering still works. branch is null since
+      // we don't fork another git invocation just to get it; the synthesized
+      // peer line in renderDigest handles branch=null gracefully.
       return {
         id: n.sessionId,
         name: "",
@@ -580,6 +586,7 @@ function liveSessions(): LiveSessionRow[] {
         project_root: projectRootForCwd(n.cwd),
         cc_loaded: false,
         pid: n.pid,
+        branch: null,
       };
     });
   });
@@ -631,6 +638,34 @@ function lastAnnounceFor(sid: string): { summary: string; age_s: number } | null
   const age_s = Math.max(0, Math.floor((now() - row.created_at_ms) / 1000));
   if (age_s > ANNOUNCE_WINDOW_MS / 1000) return null;
   return { summary: row.summary, age_s };
+}
+
+// v3.4: most-recent edit by a peer (path + age). Used to synthesize an
+// "intent" line for the peer in the digest when no fresh announcement is
+// available. Tight 200ms TTL like the rest of the read path.
+function lastEditFor(sid: string): { path: string; age_s: number } | null {
+  const row = db
+    .prepare(
+      `SELECT path, touched_at_ms FROM recent_files
+       WHERE session_id = ?
+       ORDER BY touched_at_ms DESC LIMIT 1`,
+    )
+    .get(sid) as { path: string; touched_at_ms: number } | undefined;
+  if (!row) return null;
+  const age_s = Math.max(0, Math.floor((now() - row.touched_at_ms) / 1000));
+  return { path: row.path, age_s };
+}
+
+// v3.4: synthesize a one-line intent string for a peer.
+// Priority: fresh announcement (<30 min) > most recent edit basename > "(idle)".
+// The age is encoded into render output, not the summary string itself.
+function synthesizePeerSummary(
+  lastAnnounce: { summary: string; age_s: number } | null,
+  lastEdit: { path: string; age_s: number } | null,
+): string {
+  if (lastAnnounce && lastAnnounce.age_s < 30 * 60) return lastAnnounce.summary;
+  if (lastEdit) return path.basename(lastEdit.path);
+  return "(idle)";
 }
 
 // Topics dropped from the v3 user surface; subscriptionsFor is retained for
@@ -802,16 +837,26 @@ function computeDigest(opts: { since_ms?: number | null; scope?: "project" | "gl
   // ('name' column is retained but no longer auto-populated; if a future
   // rename verb writes to it, prefer the user-set name when present.)
   // v3.3: cc_loaded propagates into the rendered digest so the "no cc"
-  // marker fires on native-only peers (their recent_files are empty and
-  // last_announce is null because the cc plugin never wrote any).
-  const sessionDigests = peers.map((p) => ({
-    session: p.name || `${p.id.slice(0, 8)} @ ${path.basename(p.cwd)}`,
-    cwd: p.cwd,
-    role: p.role,
-    recent_files: p.cc_loaded ? recentFilesFor(p.id) : [],
-    last_announce: p.cc_loaded ? lastAnnounceFor(p.id) : null,
-    cc_loaded: p.cc_loaded,
-  }));
+  // marker fires on native-only peers.
+  // v3.4: each peer carries an enriched intent summary (branch + summary +
+  // last_edit_age_s + last_announce_age_s) so the rendered roster line goes
+  // from "abcd1234 @ repo" → "abcd1234 main · auth.ts (3m ago)".
+  const sessionDigests = peers.map((p) => {
+    const lastAnnounce = p.cc_loaded ? lastAnnounceFor(p.id) : null;
+    const lastEdit = p.cc_loaded ? lastEditFor(p.id) : null;
+    return {
+      session: p.name || `${p.id.slice(0, 8)} @ ${path.basename(p.cwd)}`,
+      cwd: p.cwd,
+      role: p.role,
+      recent_files: p.cc_loaded ? recentFilesFor(p.id) : [],
+      last_announce: lastAnnounce,
+      cc_loaded: p.cc_loaded,
+      branch: p.branch,
+      last_announce_age_s: lastAnnounce?.age_s ?? null,
+      last_edit_age_s: lastEdit?.age_s ?? null,
+      summary: p.cc_loaded ? synthesizePeerSummary(lastAnnounce, lastEdit) : null,
+    };
+  });
 
   // file_overlap_alerts: v3 redesign. The v2 design used a 10-minute time
   // window: "you both touched this file in the last 10 min." That's noisy
@@ -932,6 +977,143 @@ function computeDigest(opts: { since_ms?: number | null; scope?: "project" | "gl
     questions_awaiting_me: questionsAwaitingMe,
     my_open_questions: myOpenQuestions,
   };
+}
+
+// --- digest delta (wave B, piggyback) -------------------------------------
+//
+// Lightweight "what has changed for me since I last looked" probe. Returned
+// alongside the action-specific data on sessions/send/announce so any cc
+// call surfaces the delta without forcing an explicit check. Once a delta
+// has been observed, last_checked_at_ms advances so subsequent calls don't
+// re-show the same events.
+//
+// "Piggyback": no FSWatcher, no relay file, no new hook. The trade-off is
+// that a delta only fires on the caller's NEXT cc call, not in real time.
+// Acceptable for v1; can promote to FSWatcher relay later if usage warrants.
+//
+// Returns null when nothing has changed (so we omit the field rather than
+// emit empty arrays). Excludes self from every list.
+
+type DigestDelta = {
+  since_ms: number;
+  now_ms: number;
+  new_announcements: Array<{
+    id: string;
+    from: string;
+    summary: string;
+    age_s: number;
+  }>;
+  edited_files: Array<{
+    peer: string;
+    path: string;
+    age_s: number;
+  }>;
+  peer_joins: Array<{ id: string; cwd: string }>;
+  peer_leaves: Array<{ id: string; cwd: string }>;
+};
+
+const DIGEST_DELTA_LIMIT = 10;
+
+function computeDigestDelta(): DigestDelta | null {
+  if (!MY_SESSION_ID) return null;
+  const row = db
+    .prepare(`SELECT last_checked_at_ms FROM sessions WHERE id = ?`)
+    .get(MY_SESSION_ID) as { last_checked_at_ms: number | null } | undefined;
+  // No baseline yet (first call ever) — skip; the next call sets the baseline.
+  if (!row || row.last_checked_at_ms == null) return null;
+  const since = row.last_checked_at_ms;
+  const nowMs = now();
+
+  const announcements = db
+    .prepare(
+      `SELECT id, session_id, summary, created_at_ms
+       FROM announcements
+       WHERE created_at_ms > ? AND session_id != ?
+       ORDER BY created_at_ms DESC LIMIT ?`,
+    )
+    .all(since, MY_SESSION_ID, DIGEST_DELTA_LIMIT) as Array<{
+    id: string;
+    session_id: string;
+    summary: string;
+    created_at_ms: number;
+  }>;
+
+  const edits = db
+    .prepare(
+      `SELECT session_id, path, touched_at_ms
+       FROM recent_files
+       WHERE touched_at_ms > ? AND session_id != ?
+       ORDER BY touched_at_ms DESC LIMIT ?`,
+    )
+    .all(since, MY_SESSION_ID, DIGEST_DELTA_LIMIT) as Array<{
+    session_id: string;
+    path: string;
+    touched_at_ms: number;
+  }>;
+
+  const joins = db
+    .prepare(
+      `SELECT id, cwd FROM sessions
+       WHERE started_at_ms > ? AND id != ? AND ended_at_ms IS NULL
+       ORDER BY started_at_ms DESC LIMIT ?`,
+    )
+    .all(since, MY_SESSION_ID, DIGEST_DELTA_LIMIT) as Array<{
+    id: string;
+    cwd: string;
+  }>;
+
+  const leaves = db
+    .prepare(
+      `SELECT id, cwd FROM sessions
+       WHERE ended_at_ms IS NOT NULL AND ended_at_ms > ? AND id != ?
+       ORDER BY ended_at_ms DESC LIMIT ?`,
+    )
+    .all(since, MY_SESSION_ID, DIGEST_DELTA_LIMIT) as Array<{
+    id: string;
+    cwd: string;
+  }>;
+
+  if (
+    announcements.length === 0 &&
+    edits.length === 0 &&
+    joins.length === 0 &&
+    leaves.length === 0
+  ) {
+    return null;
+  }
+
+  return {
+    since_ms: since,
+    now_ms: nowMs,
+    new_announcements: announcements.map((a) => ({
+      id: a.id,
+      from: a.session_id.slice(0, 8),
+      summary: a.summary,
+      age_s: Math.max(0, Math.floor((nowMs - a.created_at_ms) / 1000)),
+    })),
+    edited_files: edits.map((e) => ({
+      peer: e.session_id.slice(0, 8),
+      path: e.path,
+      age_s: Math.max(0, Math.floor((nowMs - e.touched_at_ms) / 1000)),
+    })),
+    peer_joins: joins.map((p) => ({ id: p.id.slice(0, 8), cwd: p.cwd })),
+    peer_leaves: leaves.map((p) => ({ id: p.id.slice(0, 8), cwd: p.cwd })),
+  };
+}
+
+// "Consume" the delta: advance last_checked_at_ms so subsequent calls don't
+// re-show the same events. Called by every action handler that surfaces the
+// delta in its response; no-op if there's no MY_SESSION_ID.
+function advanceLastChecked(): void {
+  if (!MY_SESSION_ID) return;
+  try {
+    db.prepare(`UPDATE sessions SET last_checked_at_ms = ? WHERE id = ?`).run(
+      now(),
+      MY_SESSION_ID,
+    );
+  } catch {
+    // best-effort
+  }
 }
 
 // --- MCP tool definition ---
@@ -1081,6 +1263,20 @@ server.setRequestHandler(CallToolRequestSchema, async (req) => {
   touchHeartbeat();
 
   try {
+  // Wave B: every action call is a chance to surface a digest_delta.
+  // Compute once up front; if non-null, fold into the response payload AND
+  // advance last_checked_at_ms so the same delta isn't replayed next call.
+  const delta = computeDigestDelta();
+  const withDelta = <T extends Record<string, unknown>>(payload: T): T & {
+    digest_delta?: DigestDelta;
+  } => {
+    if (delta) {
+      advanceLastChecked();
+      return { ...payload, digest_delta: delta };
+    }
+    return payload;
+  };
+
   // ---- sessions ----
   if (action.action === "sessions") {
     const includeSelf = action.include_self === true;
@@ -1104,7 +1300,7 @@ server.setRequestHandler(CallToolRequestSchema, async (req) => {
     const nativeOnlyCount = out.length - ccLoadedCount;
     return text(
       JSON.stringify(
-        {
+        withDelta({
           sessions: out,
           scope: action.scope ?? "project",
           summary: {
@@ -1116,7 +1312,7 @@ server.setRequestHandler(CallToolRequestSchema, async (req) => {
                 ? "native_only peers have a Claude Code session but cc plugin isn't wired yet — they need to restart their terminal once after install."
                 : undefined,
           },
-        },
+        }),
         null,
         2,
       ),
@@ -1142,7 +1338,7 @@ server.setRequestHandler(CallToolRequestSchema, async (req) => {
     const filename = `${now()}-${MY_SESSION_ID}-${id}.msg`;
     const dir = path.join(INBOX_DIR, target.id);
     atomicWrite(dir, filename, body);
-    return text(JSON.stringify({ id, delivered_to: [target.id] }));
+    return text(JSON.stringify(withDelta({ id, delivered_to: [target.id] })));
   }
 
   // ---- announce ----
@@ -1152,7 +1348,7 @@ server.setRequestHandler(CallToolRequestSchema, async (req) => {
       `INSERT INTO announcements (id, session_id, summary, detail, topics, created_at_ms)
        VALUES (?, ?, ?, ?, NULL, ?)`,
     ).run(id, MY_SESSION_ID, action.summary, action.detail ?? null, now());
-    return text(JSON.stringify({ id }));
+    return text(JSON.stringify(withDelta({ id })));
   }
 
   // ---- check ----
