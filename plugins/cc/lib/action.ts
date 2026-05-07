@@ -83,6 +83,41 @@ export const ActionSchema = z.discriminatedUnion("action", [
       scope: scopeSchema,
     })
     .strict(),
+
+  // Wave C: declarative subscriptions. Replaces v2 topics.
+  z
+    .object({
+      action: z.literal("subscribe"),
+      files: z
+        .string()
+        .optional()
+        .describe(
+          "file path glob (e.g. 'src/auth/**'); matches edited file paths from digest_delta. ** = any depth, * = single segment.",
+        ),
+      peers: z
+        .string()
+        .optional()
+        .describe(
+          "peer match: 'any', short id (8 hex), or full session id; restricts the subscription to this peer's activity",
+        ),
+      urgency_min: z
+        .enum(["low", "normal", "urgent", "question"])
+        .optional()
+        .describe(
+          "minimum urgency for DM matches; ignored for file/announcement events",
+        ),
+    })
+    .strict(),
+
+  z
+    .object({
+      action: z.literal("unsubscribe"),
+      id: z
+        .string()
+        .min(1)
+        .describe("subscription id from cc(action='subscribe') response"),
+    })
+    .strict(),
 ]);
 
 export type Action = z.infer<typeof ActionSchema>;
@@ -93,6 +128,8 @@ export const ACTION_NAMES: readonly ActionName[] = [
   "send",
   "announce",
   "check",
+  "subscribe",
+  "unsubscribe",
 ] as const;
 
 // --- MCP tool description ---------------------------------------------------
@@ -106,8 +143,9 @@ export const ACTION_NAMES: readonly ActionName[] = [
 // service codes.
 export const TOOL_DESCRIPTION =
   "cc — Claude Code session mesh, peer messaging, multi-agent coordination on this machine. " +
-  "Actions: sessions (list peers), send (DM peer), announce (broadcast status), check (pull digest). " +
-  "DM arrival is push-delivered via the channel; polling check is rarely needed. " +
+  "Actions: sessions (list peers), send (DM peer), announce (broadcast status), check (pull digest), " +
+  "subscribe / unsubscribe (declarative match rules surfaced as subscription_matches). " +
+  "DM arrival push-delivered via the channel; digest_delta piggybacks every cc call. " +
   "Default scope is the current git project_root.";
 
 // --- pre-built JSON Schema (cached at module load) --------------------------

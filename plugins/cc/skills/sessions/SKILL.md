@@ -45,6 +45,8 @@ If `mcp__cc__cc` isn't in your tool list:
 | "tell <peer> X", "ask <peer> Y", "ping merizo" | `send` |
 | "let peers know I'm refactoring auth", "broadcast: tests are red" | `announce` |
 | "what's happening on this machine right now?", explicit poll | `check` |
+| "alert me when anyone touches src/auth/**" | `subscribe` |
+| "stop watching for that, here's the id" | `unsubscribe` |
 
 ## Targeting peers (`send`)
 
@@ -58,6 +60,21 @@ The `to` field accepts:
 Use `urgency='question'` only when you actually need a reply; otherwise
 `'normal'` (default) is right. `'urgent'` is reserved for blocking
 coordination (e.g. "I'm about to push to the same branch you're rebasing").
+
+## Subscriptions (`subscribe` / `unsubscribe`)
+
+Declarative match rules surfaced as `subscription_matches` alongside
+`digest_delta` on every cc call. Provide at least one of:
+
+- `files`: glob like `"src/auth/**"` or `"**/test_*.py"`. `**` = any depth,
+  `*` = single segment, `?` = single char.
+- `peers`: `"any"`, an 8-hex short id, or a full session id. Restricts the
+  sub to that peer's activity.
+- `urgency_min`: `"low" | "normal" | "question" | "urgent"`. Only meaningful
+  for DM matches; ignored for file/announce events.
+
+Subscriptions are advisory — they don't filter what `digest_delta` shows.
+The model still sees everything; matches highlight what to prioritize.
 
 ## Awareness loop
 

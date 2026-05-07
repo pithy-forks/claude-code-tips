@@ -8,6 +8,27 @@ All notable changes to the cc plugin are documented here. The format follows
 
 ## [Unreleased]
 
+## [3.4.0] — 2026-05-07
+
+### Added
+- **Wave C subscriptions** — declarative match rules. Two new verbs:
+  `cc(action='subscribe', { files?, peers?, urgency_min? })` returns an
+  id; `cc(action='unsubscribe', { id })` removes. Each cc call now also
+  computes `subscription_matches` against the caller's subs and includes
+  the matching events alongside `digest_delta`. Without subs, the field
+  is omitted; with subs the model can prioritize matches without an
+  extra query.
+- **`cc_subs` table** in the schema. Idempotent CREATE; legacy v2
+  `subscriptions` (topic-based) stays dormant for back-compat.
+- **Glob matcher** — `**` for any depth, `*` for single segment, `?`
+  for single char. Path matching only (DM matching uses urgency_min).
+
+### Changed
+- `TOOL_DESCRIPTION` lists the two new verbs.
+- ACTION_NAMES bumped from 4 to 6. Schema bytes change once on `tools/list`
+  (one prompt-cache invalidation), then byte-stable.
+- `cleanupSelf()` also drops the session's `cc_subs` rows on shutdown.
+
 ## [3.3.0] — 2026-05-07
 
 ### Added
@@ -110,7 +131,8 @@ All notable changes to the cc plugin are documented here. The format follows
 ### Closed issues
 - Prior issues tracked in `BACKLOG.md` (now removed; tracked on GitHub).
 
-[Unreleased]: https://github.com/anipotts/claude-code-tips/compare/v3.3.0...HEAD
+[Unreleased]: https://github.com/anipotts/claude-code-tips/compare/v3.4.0...HEAD
+[3.4.0]: https://github.com/anipotts/claude-code-tips/releases/tag/v3.4.0
 [3.3.0]: https://github.com/anipotts/claude-code-tips/releases/tag/v3.3.0
 [3.2.0]: https://github.com/anipotts/claude-code-tips/releases/tag/v3.2.0
 [3.1.0]: https://github.com/anipotts/claude-code-tips/releases/tag/v3.1.0

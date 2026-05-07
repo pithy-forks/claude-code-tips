@@ -45,11 +45,32 @@ describe("ActionSchema (zod source of truth)", () => {
     ).toBe(true);
   });
 
-  it("rejects dropped verbs (subscribe / unsubscribe / ask / answer / cleanup)", () => {
-    for (const a of ["subscribe", "unsubscribe", "ask", "answer", "cleanup"]) {
+  it("rejects truly-dropped verbs (ask / answer / cleanup)", () => {
+    for (const a of ["ask", "answer", "cleanup"]) {
       const r = ActionSchema.safeParse({ action: a });
       expect(r.success).toBe(false);
     }
+  });
+
+  it("accepts wave C subscribe / unsubscribe", () => {
+    expect(ActionSchema.safeParse({ action: "subscribe" }).success).toBe(true);
+    expect(
+      ActionSchema.safeParse({ action: "subscribe", files: "src/**" }).success,
+    ).toBe(true);
+    expect(
+      ActionSchema.safeParse({
+        action: "subscribe",
+        peers: "any",
+        urgency_min: "question",
+      }).success,
+    ).toBe(true);
+    expect(
+      ActionSchema.safeParse({ action: "unsubscribe", id: "s_xxx" }).success,
+    ).toBe(true);
+    expect(ActionSchema.safeParse({ action: "unsubscribe" }).success).toBe(false);
+    expect(
+      ActionSchema.safeParse({ action: "unsubscribe", id: "" }).success,
+    ).toBe(false);
   });
 
   it("rejects send without required fields", () => {
@@ -102,14 +123,21 @@ describe("ActionSchema (zod source of truth)", () => {
   });
 
   it("ACTION_NAMES matches schema branches", () => {
-    expect(ACTION_NAMES).toEqual(["sessions", "send", "announce", "check"]);
+    expect(ACTION_NAMES).toEqual([
+      "sessions",
+      "send",
+      "announce",
+      "check",
+      "subscribe",
+      "unsubscribe",
+    ]);
   });
 });
 
 describe("ACTION_JSON_SCHEMA (model-facing)", () => {
   it("is a oneOf of one branch per action", () => {
     expect(ACTION_JSON_SCHEMA.oneOf).toBeDefined();
-    expect((ACTION_JSON_SCHEMA.oneOf as unknown[]).length).toBe(4);
+    expect((ACTION_JSON_SCHEMA.oneOf as unknown[]).length).toBe(ACTION_NAMES.length);
   });
 
   it("does not include anyOf (post-processed to oneOf)", () => {

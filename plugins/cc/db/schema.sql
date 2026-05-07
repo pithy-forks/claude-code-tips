@@ -49,6 +49,20 @@ CREATE TABLE IF NOT EXISTS subscriptions (
 );
 CREATE INDEX IF NOT EXISTS idx_subs_topic ON subscriptions(topic);
 
+-- Wave C: declarative subscription matchers. Replaces the v2 topic surface.
+-- Each row is one match rule for a session: "show me events that touch
+-- {file_glob} AND/OR are produced by {peer_match} AND/OR meet urgency_min".
+-- The legacy `subscriptions` table above stays dormant for back-compat.
+CREATE TABLE IF NOT EXISTS cc_subs (
+  id TEXT PRIMARY KEY,
+  session_id TEXT NOT NULL,
+  file_glob TEXT,
+  peer_match TEXT,
+  urgency_min TEXT,
+  created_at_ms INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_cc_subs_session ON cc_subs(session_id);
+
 CREATE TABLE IF NOT EXISTS recent_files (
   session_id TEXT NOT NULL,
   path TEXT NOT NULL,
