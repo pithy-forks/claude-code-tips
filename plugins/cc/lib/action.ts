@@ -21,6 +21,18 @@ import zodToJsonSchema from "zod-to-json-schema";
 
 const urgencySchema = z.enum(["low", "normal", "urgent", "question"]);
 
+// Default scope for `sessions` and `check` is "project": peers whose
+// project_root matches mine. Most cross-session coordination happens inside
+// one repo, so this drops noise on a machine running 5 claudes across 3
+// repos. "global" opts back into the v3 behavior of listing every peer on
+// the machine. Non-git cwds fall back to global automatically.
+const scopeSchema = z
+  .enum(["project", "global"])
+  .optional()
+  .describe(
+    "project (default): peers in my git project_root. global: every peer on this machine.",
+  );
+
 export const ActionSchema = z.discriminatedUnion("action", [
   z
     .object({
@@ -29,6 +41,7 @@ export const ActionSchema = z.discriminatedUnion("action", [
         .boolean()
         .optional()
         .describe("include your own session in the result (default false)"),
+      scope: scopeSchema,
     })
     .strict(),
 
@@ -67,6 +80,7 @@ export const ActionSchema = z.discriminatedUnion("action", [
         .positive()
         .optional()
         .describe("lookback window in seconds; defaults to since-last-check"),
+      scope: scopeSchema,
     })
     .strict(),
 ]);
@@ -83,18 +97,15 @@ export const ACTION_NAMES: readonly ActionName[] = [
 
 // --- MCP tool description ---------------------------------------------------
 //
-// One tool, four actions. The action enum is the model's first decision; each
-// branch's args are validated by the discriminated union at call time. We
-// intentionally narrate WHEN to pick each verb here (not just WHAT it does),
-// since the SKILL.md covers the same ground for the skill-triage model.
+// Kept terse: this string lands in every system prompt for every cc session.
+// The model gets full verb routing from skills/sessions/SKILL.md; this string
+// only needs to convey what the tool *is*, the four actions, and the push
+// guarantee for DM arrival.
 export const TOOL_DESCRIPTION =
-  "Coordinate with peer Claude Code sessions on this machine via the cc " +
-  "session mesh. One tool, four actions:\n" +
-  "  action='sessions' — list live peers (short id, cwd, recent files, last seen)\n" +
-  "  action='send' — direct-message one peer (urgency='question' if you need a reply)\n" +
-  "  action='announce' — broadcast a status update visible to all peers' next digest\n" +
-  "  action='check' — pull the awareness digest (peers' recent files, file overlaps, unread DMs)\n" +
-  "Channel push notifications cover realtime DM arrival; you don't have to call check on every turn.";
+  "Coordinate peer Claude Code sessions on this machine. " +
+  "Actions: sessions (list peers), send (DM peer), announce (broadcast status), check (pull digest). " +
+  "DM arrival is push-delivered via the channel; polling check is rarely needed. " +
+  "Default scope is the current git project_root.";
 
 // --- pre-built JSON Schema (cached at module load) --------------------------
 //

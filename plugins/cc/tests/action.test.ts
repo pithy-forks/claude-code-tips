@@ -141,12 +141,12 @@ describe("ACTION_JSON_SCHEMA (model-facing)", () => {
 describe("TOOL_DESCRIPTION", () => {
   it("mentions every action", () => {
     for (const name of ACTION_NAMES) {
-      expect(TOOL_DESCRIPTION).toContain(`action='${name}'`);
+      expect(TOOL_DESCRIPTION).toContain(name);
     }
   });
 
-  it("is under 1KB (per-prompt cost ceiling)", () => {
-    expect(TOOL_DESCRIPTION.length).toBeLessThan(1024);
+  it("stays under 512B — terse surface for haiku-tier models", () => {
+    expect(TOOL_DESCRIPTION.length).toBeLessThan(512);
   });
 });
 
