@@ -100,9 +100,12 @@ export const ACTION_NAMES: readonly ActionName[] = [
 // Kept terse: this string lands in every system prompt for every cc session.
 // The model gets full verb routing from skills/sessions/SKILL.md; this string
 // only needs to convey what the tool *is*, the four actions, and the push
-// guarantee for DM arrival.
+// guarantee for DM arrival. Disambiguating tokens up front so ToolSearch on
+// "session mesh" / "peer messaging" / "multi-agent coordination" matches — a
+// bare "cc" collides with Slack mention syntax, MCP server prefixes, and AWS
+// service codes.
 export const TOOL_DESCRIPTION =
-  "Coordinate peer Claude Code sessions on this machine. " +
+  "cc — Claude Code session mesh, peer messaging, multi-agent coordination on this machine. " +
   "Actions: sessions (list peers), send (DM peer), announce (broadcast status), check (pull digest). " +
   "DM arrival is push-delivered via the channel; polling check is rarely needed. " +
   "Default scope is the current git project_root.";

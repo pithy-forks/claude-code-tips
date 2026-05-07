@@ -252,12 +252,14 @@ function readGitContext(cwd: string): GitContext {
   if (commonRes.status === 0) {
     const commonDir = commonRes.stdout.trim();
     // common-dir can be:
+    //   - ".git"                                          primary repo, cwd IS repo root
     //   - "<abs>/.git"                                    primary repo, abs path
     //   - "<abs>/.git/worktrees/<name>"                   linked worktree, abs
     //   - "../.git" / "../../.git"                        primary repo, relative to cwd
     //   - "../../.git/worktrees/<name>"                   linked worktree, relative
-    // Strip /.git[/worktrees/<name>] then resolve relative paths against cwd.
-    const stripped = commonDir.replace(/\/\.git(?:\/worktrees\/[^/]+)?$/, "");
+    // Strip optional leading-slash + .git[/worktrees/<name>], then resolve
+    // any relative result against cwd. Empty result means cwd is repo root.
+    const stripped = commonDir.replace(/(?:^|\/)\.git(?:\/worktrees\/[^/]+)?$/, "");
     project_root = path.isAbsolute(stripped)
       ? stripped
       : path.resolve(cwd, stripped);
@@ -443,24 +445,144 @@ type LiveSessionRow = {
   last_seen_at_ms: number;
   started_at_ms: number;
   project_root: string | null;
+  // v3.3: cc_loaded distinguishes "this peer has cc's MCP server up" (we
+  // have a row in our sessions table for it) from "this peer is live in CC
+  // but cc plugin not yet wired in that terminal" (only a native session
+  // file exists). The install-trial UX needs both visible.
+  cc_loaded: boolean;
+  pid: number | null;
 };
 
-// 200ms TTL: peer state genuinely changes (action calls + transcript activity
-// refresh last_seen, ended_at flips on shutdown), but within a single user
-// turn the answer is stable. Tight window means cross-turn freshness lives.
+type NativeSession = {
+  sessionId: string;
+  cwd: string;
+  pid: number;
+  mtimeMs: number;
+};
+
+// CC drops ~/.claude/sessions/<pid>.json for every live interactive session.
+// We treat that directory as the authoritative service-discovery layer: a
+// session is "live" iff its file exists AND its pid is still alive. cc's
+// own sessions table is a metadata cache layered on top.
+function nativeLiveSessions(): NativeSession[] {
+  const dir = path.join(CLAUDE_DIR, "sessions");
+  let entries: string[];
+  try {
+    entries = fs.readdirSync(dir);
+  } catch {
+    return [];
+  }
+  const out: NativeSession[] = [];
+  for (const f of entries) {
+    if (!f.endsWith(".json") || f.startsWith(".")) continue;
+    const pid = parseInt(f.replace(/\.json$/, ""), 10);
+    if (!Number.isFinite(pid) || pid <= 0) continue;
+    // Liveness check: signal 0 throws if the process is dead. CC may leave
+    // stale session files behind on dirty exit; this filters them out.
+    try {
+      process.kill(pid, 0);
+    } catch {
+      continue;
+    }
+    const fp = path.join(dir, f);
+    try {
+      const stat = fs.statSync(fp);
+      const raw = JSON.parse(fs.readFileSync(fp, "utf-8")) as {
+        sessionId?: string;
+        cwd?: string;
+      };
+      if (!raw.sessionId) continue;
+      out.push({
+        sessionId: raw.sessionId,
+        cwd: raw.cwd || "",
+        pid,
+        mtimeMs: stat.mtimeMs,
+      });
+    } catch {
+      continue;
+    }
+  }
+  return out;
+}
+
+// Per-cwd project_root cache for non-cc-loaded peers. cc-loaded peers carry
+// project_root in the sessions row; native-only peers need git resolution
+// to participate in scope filtering. One git invocation per distinct cwd
+// per cc server lifetime is fine.
+const projectRootCache = new Map<string, string | null>();
+function projectRootForCwd(cwd: string): string | null {
+  if (!cwd) return null;
+  const cached = projectRootCache.get(cwd);
+  if (cached !== undefined) return cached;
+  const ctx = readGitContext(cwd);
+  projectRootCache.set(cwd, ctx.project_root);
+  return ctx.project_root;
+}
+
+// 200ms TTL: peer state genuinely changes (action calls + hook activity
+// refresh last_seen, native session files appear/disappear), but within a
+// single user turn the answer is stable. Tight window means cross-turn
+// freshness lives.
 const liveSessionsCache = new TTLCache<"all", LiveSessionRow[]>(200);
 
 function liveSessions(): LiveSessionRow[] {
-  return liveSessionsCache.get("all", () =>
-    db
+  return liveSessionsCache.get("all", () => {
+    const native = nativeLiveSessions();
+    if (native.length === 0) {
+      // No native session files visible (unusual layout). Fall back to
+      // cc-table-only and treat every row as cc_loaded=true (it has to
+      // be — the row exists because cc booted).
+      return (
+        db
+          .prepare(
+            `SELECT id, name, cwd, role, last_seen_at_ms, started_at_ms, project_root, pid
+             FROM sessions
+             WHERE ended_at_ms IS NULL AND last_seen_at_ms > ?
+             ORDER BY last_seen_at_ms DESC`,
+          )
+          .all(now() - STALE_SESSION_AFTER_MS) as Array<
+          Omit<LiveSessionRow, "cc_loaded">
+        >
+      ).map<LiveSessionRow>((r) => ({ ...r, cc_loaded: true }));
+    }
+    // Cross-reference native sessions with cc table by session_id.
+    const ccRows = db
       .prepare(
-        `SELECT id, name, cwd, role, last_seen_at_ms, started_at_ms, project_root
+        `SELECT id, name, cwd, role, last_seen_at_ms, started_at_ms, project_root, pid
          FROM sessions
-         WHERE ended_at_ms IS NULL AND last_seen_at_ms > ?
-         ORDER BY last_seen_at_ms DESC`,
+         WHERE ended_at_ms IS NULL`,
       )
-      .all(now() - STALE_SESSION_AFTER_MS) as LiveSessionRow[],
-  );
+      .all() as Array<Omit<LiveSessionRow, "cc_loaded">>;
+    const ccById = new Map<string, (typeof ccRows)[number]>();
+    for (const r of ccRows) ccById.set(r.id, r);
+
+    return native.map<LiveSessionRow>((n) => {
+      const cc = ccById.get(n.sessionId);
+      if (cc) {
+        return {
+          ...cc,
+          cwd: cc.cwd || n.cwd,
+          last_seen_at_ms: Math.max(cc.last_seen_at_ms, n.mtimeMs),
+          pid: cc.pid ?? n.pid,
+          cc_loaded: true,
+        };
+      }
+      // Native-only peer (cc plugin not wired in that terminal yet).
+      // Synthesize a row from native data; derive project_root via cached
+      // git lookup so scope filtering still works.
+      return {
+        id: n.sessionId,
+        name: "",
+        cwd: n.cwd,
+        role: null,
+        last_seen_at_ms: n.mtimeMs,
+        started_at_ms: n.mtimeMs,
+        project_root: projectRootForCwd(n.cwd),
+        cc_loaded: false,
+        pid: n.pid,
+      };
+    });
+  });
 }
 
 // Project-scoped filter: keep peers in my project_root. If I'm in a non-git
@@ -679,12 +801,16 @@ function computeDigest(opts: { since_ms?: number | null; scope?: "project" | "gl
   // session_digests: one per live peer. v3 identity = "<short-id> @ <cwd-basename>"
   // ('name' column is retained but no longer auto-populated; if a future
   // rename verb writes to it, prefer the user-set name when present.)
+  // v3.3: cc_loaded propagates into the rendered digest so the "no cc"
+  // marker fires on native-only peers (their recent_files are empty and
+  // last_announce is null because the cc plugin never wrote any).
   const sessionDigests = peers.map((p) => ({
     session: p.name || `${p.id.slice(0, 8)} @ ${path.basename(p.cwd)}`,
     cwd: p.cwd,
     role: p.role,
-    recent_files: recentFilesFor(p.id),
-    last_announce: lastAnnounceFor(p.id),
+    recent_files: p.cc_loaded ? recentFilesFor(p.id) : [],
+    last_announce: p.cc_loaded ? lastAnnounceFor(p.id) : null,
+    cc_loaded: p.cc_loaded,
   }));
 
   // file_overlap_alerts: v3 redesign. The v2 design used a 10-minute time
@@ -968,10 +1094,33 @@ server.setRequestHandler(CallToolRequestSchema, async (req) => {
         cwd_basename: path.basename(s.cwd),
         cwd: s.cwd,
         role: s.role ?? null,
-        recent_files: recentFilesFor(s.id),
+        // Native-only peers don't have recent_files (no cc hook fired in
+        // that terminal yet). Surface an empty array, not stale data.
+        recent_files: s.cc_loaded ? recentFilesFor(s.id) : [],
         last_seen_s: Math.max(0, Math.floor((now() - s.last_seen_at_ms) / 1000)),
+        cc_loaded: s.cc_loaded,
       }));
-    return text(JSON.stringify({ sessions: out, scope: action.scope ?? "project" }, null, 2));
+    const ccLoadedCount = out.filter((s) => s.cc_loaded).length;
+    const nativeOnlyCount = out.length - ccLoadedCount;
+    return text(
+      JSON.stringify(
+        {
+          sessions: out,
+          scope: action.scope ?? "project",
+          summary: {
+            total: out.length,
+            cc_loaded: ccLoadedCount,
+            native_only: nativeOnlyCount,
+            hint:
+              nativeOnlyCount > 0
+                ? "native_only peers have a Claude Code session but cc plugin isn't wired yet — they need to restart their terminal once after install."
+                : undefined,
+          },
+        },
+        null,
+        2,
+      ),
+    );
   }
 
   // ---- send ----

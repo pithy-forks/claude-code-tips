@@ -26,6 +26,10 @@ export type SessionDigest = {
   role?: string | null;
   recent_files: string[];
   last_announce?: { summary: string; age_s: number } | null;
+  // v3.3: false when the peer is visible via ~/.claude/sessions/<pid>.json
+  // but cc's MCP server isn't up in that terminal yet (typical on the first
+  // install before the user reloads other terminals).
+  cc_loaded?: boolean;
 };
 
 export type OverlapAlert = {
@@ -125,14 +129,23 @@ export function renderDigest(d: Digest): string {
 
   if (d.session_digests.length > 0) {
     lines.push("");
-    lines.push("activity:");
+    const ccLoadedCount = d.session_digests.filter(
+      (s) => s.cc_loaded !== false,
+    ).length;
+    const nativeOnlyCount = d.session_digests.length - ccLoadedCount;
+    lines.push(
+      nativeOnlyCount > 0
+        ? `activity (${ccLoadedCount} cc-loaded, ${nativeOnlyCount} need /reload-plugins):`
+        : "activity:",
+    );
     for (const s of d.session_digests) {
       const files = s.recent_files.slice(0, 3).map((f) => shortPath(f)).join(", ");
       const filesStr = files ? ` (${files})` : "";
       const announce = s.last_announce
         ? `: ${previewOf(s.last_announce.summary, 160)} [${formatAge(s.last_announce.age_s)}]`
         : "";
-      lines.push(`- ${s.session} @ ${shortPath(s.cwd)}${filesStr}${announce}`);
+      const marker = s.cc_loaded === false ? " [no cc]" : "";
+      lines.push(`- ${s.session} @ ${shortPath(s.cwd)}${marker}${filesStr}${announce}`);
     }
   }
 
