@@ -1,3 +1,5 @@
+<!-- tested with: claude code v2.1.132 -->
+
 # Changelog
 
 All notable changes to the cc plugin are documented here. The format follows
