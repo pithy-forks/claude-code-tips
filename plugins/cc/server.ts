@@ -79,21 +79,22 @@ const QUESTIONS_DIR = path.join(CC_DIR, "questions");
 const DB_PATH = path.join(CC_DIR, "sessions.db");
 
 // --- session identity resolution -------------------------------------------
-// CC v2.1.121 does not pass CLAUDE_SESSION_ID to MCP child processes (verified
-// 2026-04-28: env passed includes CLAUDE_PLUGIN_DATA, CLAUDE_CODE_*, but not
-// CLAUDE_SESSION_ID). However CC writes a per-pid metadata file to
-// ~/.claude/sessions/<pid>.json containing { sessionId, cwd, kind, ... } for
-// every interactive CC process. We resolve identity by walking up the parent
-// process chain looking for a pid whose session file exists.
+// Resolution order:
 //
-// Why walk up: the MCP child's direct ppid is usually a shell or the bun
-// runner, not the CC parent. The CC process is one or two levels further up.
-// Stop at depth 8 to avoid infinite loops on weird process trees.
+//   1. CLAUDE_CODE_SESSION_ID env var (Claude Code v2.1.132+, the canonical
+//      session id, exposed alongside CLAUDE_PLUGIN_DATA and friends).
+//   2. CLAUDE_SESSION_ID env var (older naming, kept for tests + forward-compat
+//      if CC ever ships a renamed alias).
+//   3. Parent-pid walk against ~/.claude/sessions/<pid>.json (legacy path for
+//      CC <2.1.132, where MCP children did not inherit any session-id env).
+//      The MCP child's direct ppid is usually a shell or the bun runner, so we
+//      walk up to 8 hops looking for an ancestor whose CC session file exists.
+//   4. Synthetic UUID fallback. Better to register a row than be invisible.
+//      Marked with kind="synthetic" so the mesh knows it's not a real peer.
 //
-// Fallback: if the walk fails (orphaned process, non-interactive entrypoint,
-// or session file ENOENT), generate a UUID4 so the server can still register
-// itself. Marked with `kind: "synthetic"` in the row so we know it's not a
-// real CC session.
+// The legacy walk is dead code on modern CC but cheap to keep — one ps spawn
+// per failed lookup, and the env-var paths short-circuit before we ever get
+// there. Drop in a future release once 2.1.131 and earlier are out of use.
 import { execSync, spawnSync } from "node:child_process";
 
 type ResolvedIdentity = {
@@ -133,12 +134,17 @@ function getParentPid(pid: number): number | null {
 }
 
 function resolveIdentity(): ResolvedIdentity {
-  // 1. Honor explicit env override (rare, but tests + future CC versions may set it).
+  // 1. CC 2.1.132+ exposes the session id directly to MCP children. Prefer this.
+  const codeEnvId = process.env.CLAUDE_CODE_SESSION_ID;
+  if (codeEnvId) {
+    return { sessionId: codeEnvId, cwd: process.cwd(), kind: "env" };
+  }
+  // 2. Legacy env name (tests, forward-compat).
   const envId = process.env.CLAUDE_SESSION_ID;
   if (envId) {
     return { sessionId: envId, cwd: process.cwd(), kind: "env" };
   }
-  // 2. Walk parent chain up to 8 hops; first ancestor with a CC session file wins.
+  // 3. CC <2.1.132 fallback: walk parent pid chain looking for a CC session file.
   let pid: number | null = process.pid;
   for (let depth = 0; depth < 8 && pid !== null; depth++) {
     const ident = readSessionFile(pid);
@@ -935,7 +941,7 @@ server.setRequestHandler(CallToolRequestSchema, async (req) => {
   const action: Action = parsed.action;
 
   if (!MY_SESSION_ID && action.action !== "sessions") {
-    return errorText("cc: CLAUDE_SESSION_ID not set; most verbs disabled.");
+    return errorText("cc: CLAUDE_CODE_SESSION_ID not set; most verbs disabled.");
   }
 
   // Exfil guard: 'send' and 'announce' produce payloads the recipient's model
