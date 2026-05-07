@@ -7,6 +7,7 @@ description: |
   "what other sessions are active?", "tell <name> to ...", "ping <peer>",
   "let peers know I'm doing X", "broadcast <status>", "check the cc digest",
   or any cross-session / multi-agent coordination on this machine.
+model: haiku
 ---
 <!-- tested with: claude code v2.1.132 -->
 
