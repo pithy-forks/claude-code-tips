@@ -108,12 +108,18 @@ const _raw = zodToJsonSchema(ActionSchema, {
 });
 
 // zod-to-json-schema wraps the result in {$schema, ...rest}. We want the rest.
-const { $schema: _drop, ...stripped } = _raw as { $schema?: string } & Record<
-  string,
-  unknown
->;
+const { $schema: _drop, anyOf: _branches, ...stripped } = _raw as {
+  $schema?: string;
+  anyOf?: unknown[];
+} & Record<string, unknown>;
 
-export const ACTION_JSON_SCHEMA = stripped as Record<string, unknown>;
+// Discriminated unions SHOULD use `oneOf` per JSON Schema 2020-12 + OpenAPI.
+// Some MCP clients treat `anyOf` permissively (multi-branch match) whereas
+// `oneOf` is exclusive -- closer to the discriminated-union semantic.
+const withOneOf =
+  _branches !== undefined ? { ...stripped, oneOf: _branches } : stripped;
+
+export const ACTION_JSON_SCHEMA = withOneOf as Record<string, unknown>;
 
 // --- runtime helpers --------------------------------------------------------
 
