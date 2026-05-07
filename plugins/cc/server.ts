@@ -26,7 +26,6 @@ import * as os from "node:os";
 import { randomBytes } from "node:crypto";
 
 import { openDb, migrateLegacyStateDir } from "./db/migrate.js";
-import { startTranscriptTail } from "./lib/transcript-tail.js";
 import { renderDigest, type Digest } from "./lib/render.js";
 import {
   ACTION_JSON_SCHEMA,
@@ -297,22 +296,26 @@ if (MY_SESSION_ID) {
   fs.mkdirSync(path.join(INBOX_DIR, MY_SESSION_ID), { recursive: true });
 }
 
-// --- lifecycle: transcript tail + inbox watcher + db close
+// --- lifecycle: inbox watcher + db close
 //
 // Each background concern is registered as a Resource. Lifecycle.start()
 // fires after MCP transport connects (so notifications can flow); stop() is
 // LIFO at shutdown. Errors during stop() log to stderr but never block the
 // rest of the cleanup path -- a half-shutdown is better than a stuck process.
+//
+// v3.2: transcript-tail is gone. recent_files now populated by the
+// PostToolUse hook in plugins/cc/hooks/post-tool-use.ts; the hook also writes
+// last_seen_at_ms on the sessions row, which is the defensive heartbeat for
+// edit-only sessions that never call cc verbs directly.
 const lifecycle = new Lifecycle();
 
 // --- lazy heartbeat ---------------------------------------------------------
-// v3.2 dropped the 30s setInterval. Liveness is now driven by activity:
-//   - every cc action call refreshes last_seen + git context
-//   - every transcript-tail readDelta refreshes last_seen + git context
-// A peer that's neither calling cc nor producing transcript events is by
-// definition silent on this machine, and going stale after STALE_SESSION_MS
-// is correct. Git context refresh is rate-limited so a busy edit burst
-// doesn't fork `git rev-parse` every line.
+// Liveness is driven by activity from two sources:
+//   - every cc action call (touchHeartbeat below)
+//   - every PostToolUse hook fire (writes directly to sessions.last_seen_at_ms)
+// A peer that's neither calling cc nor editing files is by definition silent,
+// and going stale after STALE_SESSION_MS is correct. Git context refresh is
+// rate-limited so a busy action burst doesn't fork `git rev-parse` every call.
 
 const GIT_CONTEXT_TTL_MS = 60_000;
 let lastGitContextRefreshMs = now();
@@ -337,28 +340,6 @@ function touchHeartbeat(): void {
     // ignore transient sqlite busy
   }
 }
-
-let transcriptTailStop: (() => void) | null = null;
-lifecycle.add({
-  name: "transcript-tail",
-  start: () => {
-    if (!MY_SESSION_ID) return;
-    transcriptTailStop = startTranscriptTail({
-      db,
-      sessionId: MY_SESSION_ID,
-      cwd: MY_CWD,
-      onActivity: touchHeartbeat,
-      gitContext: () => ({
-        branch: myGitContext.branch,
-        worktree_root: myGitContext.worktree_root,
-      }),
-    });
-  },
-  stop: () => {
-    transcriptTailStop?.();
-    transcriptTailStop = null;
-  },
-});
 
 // --- helpers ---
 
