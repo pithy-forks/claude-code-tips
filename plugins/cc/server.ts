@@ -366,6 +366,7 @@ function cleanupSelf(): void {
       MY_SESSION_ID,
     );
     db.prepare(`DELETE FROM subscriptions WHERE session_id = ?`).run(MY_SESSION_ID);
+    db.prepare(`DELETE FROM cc_subs WHERE session_id = ?`).run(MY_SESSION_ID);
     db.prepare(`DELETE FROM recent_files WHERE session_id = ?`).run(MY_SESSION_ID);
   } catch {
     // db may already be closing during shutdown; best-effort
@@ -1116,6 +1117,153 @@ function advanceLastChecked(): void {
   }
 }
 
+// --- subscription matcher (wave C) ----------------------------------------
+//
+// Subscriptions are declarative match rules that ride on top of the digest_delta.
+// Computed alongside the delta on every cc call: each of the caller's subs is
+// tested against the delta's events and the inbox's unread DMs. Matches are
+// surfaced in the response so the model can prioritize without re-querying.
+//
+// Match semantics: a sub matches an event when ALL of its non-null filters
+// pass.
+//   - file_glob:   restrict to events whose path matches the glob
+//   - peer_match:  restrict to events from this peer (short id, full id, or "any")
+//   - urgency_min: only meaningful for DM events; ignored for files / announces
+//
+// A sub with all three null is a no-op (matches nothing) by design — the
+// schema in lib/action.ts steers callers to provide at least one filter.
+
+type SubRow = {
+  id: string;
+  file_glob: string | null;
+  peer_match: string | null;
+  urgency_min: string | null;
+};
+
+type SubMatchEvent =
+  | { kind: "edited_file"; peer: string; path: string; age_s: number }
+  | { kind: "announcement"; peer: string; summary: string; age_s: number }
+  | { kind: "dm"; from: string; subject: string; urgency: string; age_s: number };
+
+type SubscriptionMatch = {
+  sub_id: string;
+  events: SubMatchEvent[];
+};
+
+const URGENCY_RANK: Record<string, number> = {
+  low: 0,
+  normal: 1,
+  question: 2,
+  urgent: 3,
+};
+
+// Convert a path glob to a RegExp.
+//   `**` matches any number of path segments (including zero).
+//   `*`  matches any chars except `/`.
+//   `?`  matches a single char except `/`.
+//   Other regex metachars are escaped.
+function globToRegex(glob: string): RegExp {
+  const DOUBLE = " ";
+  const escaped = glob
+    .replace(/[.+^$()[\]{}|\\]/g, "\\$&")
+    .replace(/\*\*/g, DOUBLE)
+    .replace(/\*/g, "[^/]*")
+    .split(DOUBLE)
+    .join(".*")
+    .replace(/\?/g, "[^/]");
+  return new RegExp(`^${escaped}$`);
+}
+
+function peerMatches(filter: string | null, peerId: string): boolean {
+  if (!filter || filter === "any") return true;
+  // Compare by prefix to support short ids (8 hex) or full ids.
+  return peerId === filter || peerId.startsWith(filter) || filter.startsWith(peerId);
+}
+
+function computeSubscriptionMatches(
+  delta: DigestDelta | null,
+): SubscriptionMatch[] {
+  if (!MY_SESSION_ID) return [];
+  const subs = db
+    .prepare(
+      `SELECT id, file_glob, peer_match, urgency_min FROM cc_subs WHERE session_id = ?`,
+    )
+    .all(MY_SESSION_ID) as SubRow[];
+  if (subs.length === 0) return [];
+
+  // Inbox DMs: scan unread .msg files for urgency-matching subs. We only
+  // need one pass even if multiple subs match.
+  type InboxEntry = { fromSid: string; subject: string; urgency: string; age_s: number };
+  const inbox: InboxEntry[] = [];
+  if (subs.some((s) => s.urgency_min)) {
+    try {
+      const myInbox = path.join(INBOX_DIR, MY_SESSION_ID);
+      const nowMs = now();
+      for (const f of fs.readdirSync(myInbox)) {
+        if (!f.endsWith(".msg") || f.startsWith(".")) continue;
+        try {
+          const m = parseMsgFile(fs.readFileSync(path.join(myInbox, f), "utf-8"));
+          inbox.push({
+            fromSid: m.fromSid || "",
+            subject: m.subject,
+            urgency: m.urgency,
+            age_s: Math.max(0, Math.floor((nowMs - m.created_at_ms) / 1000)),
+          });
+        } catch {
+          // skip
+        }
+      }
+    } catch {
+      // no inbox dir
+    }
+  }
+
+  const matches: SubscriptionMatch[] = [];
+  for (const sub of subs) {
+    const events: SubMatchEvent[] = [];
+    const re = sub.file_glob ? globToRegex(sub.file_glob) : null;
+
+    if (delta) {
+      // file events
+      for (const ef of delta.edited_files) {
+        if (re && !re.test(ef.path)) continue;
+        if (!peerMatches(sub.peer_match, ef.peer)) continue;
+        events.push({ kind: "edited_file", peer: ef.peer, path: ef.path, age_s: ef.age_s });
+      }
+      // announcement events: only when no file_glob is set (announcements
+      // don't have paths, so a file_glob filter excludes them by intent).
+      if (!sub.file_glob) {
+        for (const ann of delta.new_announcements) {
+          if (!peerMatches(sub.peer_match, ann.from)) continue;
+          events.push({ kind: "announcement", peer: ann.from, summary: ann.summary, age_s: ann.age_s });
+        }
+      }
+    }
+
+    // DM events: orthogonal to delta. Filter by urgency_min and peer_match.
+    if (sub.urgency_min) {
+      const min = URGENCY_RANK[sub.urgency_min] ?? 0;
+      for (const dm of inbox) {
+        const dmShort = dm.fromSid.slice(0, 8);
+        if (!peerMatches(sub.peer_match, dmShort)) continue;
+        if ((URGENCY_RANK[dm.urgency] ?? 0) < min) continue;
+        events.push({
+          kind: "dm",
+          from: dmShort,
+          subject: dm.subject,
+          urgency: dm.urgency,
+          age_s: dm.age_s,
+        });
+      }
+    }
+
+    if (events.length > 0) {
+      matches.push({ sub_id: sub.id, events });
+    }
+  }
+  return matches;
+}
+
 // --- MCP tool definition ---
 //
 // One tool, four actions. Verb surface lives in lib/action.ts; this file is
@@ -1266,15 +1414,25 @@ server.setRequestHandler(CallToolRequestSchema, async (req) => {
   // Wave B: every action call is a chance to surface a digest_delta.
   // Compute once up front; if non-null, fold into the response payload AND
   // advance last_checked_at_ms so the same delta isn't replayed next call.
+  // Wave C: also surface subscription_matches if the caller has any subs.
   const delta = computeDigestDelta();
+  const subMatches = computeSubscriptionMatches(delta);
   const withDelta = <T extends Record<string, unknown>>(payload: T): T & {
     digest_delta?: DigestDelta;
+    subscription_matches?: SubscriptionMatch[];
   } => {
+    let out: typeof payload & {
+      digest_delta?: DigestDelta;
+      subscription_matches?: SubscriptionMatch[];
+    } = payload;
     if (delta) {
       advanceLastChecked();
-      return { ...payload, digest_delta: delta };
+      out = { ...out, digest_delta: delta };
     }
-    return payload;
+    if (subMatches.length > 0) {
+      out = { ...out, subscription_matches: subMatches };
+    }
+    return out;
   };
 
   // ---- sessions ----
@@ -1349,6 +1507,49 @@ server.setRequestHandler(CallToolRequestSchema, async (req) => {
        VALUES (?, ?, ?, ?, NULL, ?)`,
     ).run(id, MY_SESSION_ID, action.summary, action.detail ?? null, now());
     return text(JSON.stringify(withDelta({ id })));
+  }
+
+  // ---- subscribe (wave C) ----
+  if (action.action === "subscribe") {
+    if (!action.files && !action.peers && !action.urgency_min) {
+      return errorText(
+        "cc.subscribe: provide at least one of {files, peers, urgency_min}; an empty match is a no-op.",
+      );
+    }
+    const id = newId("s");
+    db.prepare(
+      `INSERT INTO cc_subs (id, session_id, file_glob, peer_match, urgency_min, created_at_ms)
+       VALUES (?, ?, ?, ?, ?, ?)`,
+    ).run(
+      id,
+      MY_SESSION_ID,
+      action.files ?? null,
+      action.peers ?? null,
+      action.urgency_min ?? null,
+      now(),
+    );
+    return text(
+      JSON.stringify(
+        withDelta({
+          id,
+          subscription: {
+            files: action.files ?? null,
+            peers: action.peers ?? null,
+            urgency_min: action.urgency_min ?? null,
+          },
+        }),
+      ),
+    );
+  }
+
+  // ---- unsubscribe (wave C) ----
+  if (action.action === "unsubscribe") {
+    const res = db
+      .prepare(`DELETE FROM cc_subs WHERE id = ? AND session_id = ?`)
+      .run(action.id, MY_SESSION_ID);
+    return text(
+      JSON.stringify(withDelta({ removed: res.changes > 0, id: action.id })),
+    );
   }
 
   // ---- check ----
