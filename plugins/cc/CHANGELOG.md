@@ -8,6 +8,34 @@ All notable changes to the cc plugin are documented here. The format follows
 
 ## [Unreleased]
 
+## [3.7.0] — 2026-05-08
+
+### Removed (pre-v3 + dead code purge)
+- `LEGACY_TOOL_NAMES` map (cc_sessions/cc_send/cc_announce/cc_check
+  pre-v3 per-verb tool names). Single tool surface (`cc` with action arg)
+  has been canonical since v3.0.
+- `migrateLegacyStateDir` + `LEGACY_CC_DIR` const + import. Pre-v3
+  `~/.claude/cc/` → `~/.claude/channels/cc/` migration. Anyone on v2 has
+  long since upgraded.
+- `STATIC_MODE` env var. Declared but never enforced anywhere.
+- `subscriptionsFor()` function. Read the legacy v2 `subscriptions` table
+  but had zero callers in v3+.
+- `topic_unread` field from the `Digest` type + the entire topics
+  rendering branch in `lib/render.ts`. Was hardcoded to `{}` in
+  `computeDigest` since v3.0; the topics surface was dropped from the
+  user-facing actions.
+- `questions_awaiting_me` + `my_open_questions` fields from the `Digest`
+  type. Both were always-empty arrays since v3.0; questions surface
+  was deferred indefinitely.
+- `TopicMsg` and `QuestionAwaitingMe` types from `lib/render.ts`.
+- The `low drops topic_unread previews` test (the feature it tested no
+  longer exists).
+
+### Why
+Zero users — no need for backwards compatibility. Removing dead code is
+strictly easier than maintaining it. ~165 LOC delete, 14 LOC added,
+net -150. Tests: 44 → 43 (one test removed alongside its surface).
+
 ## [3.6.0] — 2026-05-08
 
 ### Added
