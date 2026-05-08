@@ -1,8 +1,28 @@
-// tested with: claude code v2.1.118
+// tested with: claude code v2.1.133
 // Renders a Digest into a plain-text block suitable for hook additionalContext injection.
 // Empty if nothing to say; caller skips the hook output when this returns "".
 
 import * as os from "node:os";
+
+// v3.5: digest verbosity tunes by $CLAUDE_EFFORT (CC 2.1.133+).
+//   low    — single-line peers, no summary parenthetical, drop topic_unread
+//            previews to titles only, message previews capped at 80 chars.
+//   medium — default; current shape (one line per peer with summary suffix).
+//   high   — peers expand to show up to 3 recent_files; full announce body
+//            (no preview cap); topic_unread shows full message previews.
+//
+// effort source priority for the renderer (resolved by callers, passed in):
+//   1. action call's stored effort (per-session) if present
+//   2. process.env.CLAUDE_EFFORT (Bash subprocess — CC 2.1.133+)
+//   3. fallback 'medium'
+//
+// renderer is a pure function; effort is a parameter, not read from env here.
+export type Effort = "low" | "medium" | "high";
+const PREVIEW_BY_EFFORT: Record<Effort, number> = {
+  low: 80,
+  medium: 140,
+  high: 240,
+};
 
 export type DirectMsg = {
   id: string;
@@ -90,7 +110,7 @@ function previewOf(s: string, max = 140): string {
   return trimmed.slice(0, max - 1) + "…";
 }
 
-export function renderDigest(d: Digest): string {
+export function renderDigest(d: Digest, effort: Effort = "medium"): string {
   const empty =
     d.direct_unread.length === 0 &&
     Object.keys(d.topic_unread).length === 0 &&
@@ -99,6 +119,7 @@ export function renderDigest(d: Digest): string {
     d.questions_awaiting_me.length === 0;
   if (empty) return "";
 
+  const previewMax = PREVIEW_BY_EFFORT[effort];
   const lines: string[] = [];
   const label = d.is_delta ? "update" : "digest";
   lines.push(`cc ${label} (${d.active_session_count} other ${d.active_session_count === 1 ? "session" : "sessions"} active)`);
@@ -109,7 +130,7 @@ export function renderDigest(d: Digest): string {
     for (const m of d.direct_unread) {
       const subj = m.subject ? `"${m.subject}"` : "";
       const tag = m.urgency !== "normal" ? `, ${m.urgency}` : "";
-      lines.push(`- ${m.from} (${formatAge(m.age_s)}${tag}) ${subj}: ${previewOf(m.preview)}`);
+      lines.push(`- ${m.from} (${formatAge(m.age_s)}${tag}) ${subj}: ${previewOf(m.preview, previewMax)}`);
     }
   }
 
@@ -119,9 +140,11 @@ export function renderDigest(d: Digest): string {
     for (const t of topics) {
       const msgs = d.topic_unread[t];
       lines.push(`topic ${t} (${msgs.length} new):`);
+      // low effort: titles only, no body previews
+      if (effort === "low") continue;
       for (const m of msgs) {
         const subj = m.subject ? `"${m.subject}"` : "";
-        lines.push(`- ${m.from} (${formatAge(m.age_s)}) ${subj}: ${previewOf(m.preview)}`);
+        lines.push(`- ${m.from} (${formatAge(m.age_s)}) ${subj}: ${previewOf(m.preview, previewMax)}`);
       }
     }
   }
@@ -132,7 +155,7 @@ export function renderDigest(d: Digest): string {
     for (const q of d.questions_awaiting_me) {
       const opts = q.options && q.options.length > 0 ? ` options: ${q.options.join(" / ")}` : "";
       const blocker = q.blocking ? " [blocking]" : "";
-      lines.push(`- ${q.id} from ${q.from}${blocker}: ${previewOf(q.question, 200)}${opts}`);
+      lines.push(`- ${q.id} from ${q.from}${blocker}: ${previewOf(q.question, Math.max(previewMax, 200))}${opts}`);
     }
   }
 
@@ -158,9 +181,20 @@ export function renderDigest(d: Digest): string {
           s.last_announce_age_s != null && s.last_announce_age_s < 30 * 60
             ? s.last_announce_age_s
             : s.last_edit_age_s ?? null;
-        const ageStr = driverAge != null ? ` (${formatAge(driverAge)} ago)` : "";
         const branchStr = s.branch ? ` ${s.branch}` : "";
-        lines.push(`- ${s.session}${branchStr} · ${previewOf(s.summary, 100)}${ageStr}`);
+
+        if (effort === "low") {
+          // single line, no summary parenthetical, no edit-age — just identity
+          lines.push(`- ${s.session}${branchStr}${marker}`);
+        } else {
+          const ageStr = driverAge != null ? ` (${formatAge(driverAge)} ago)` : "";
+          lines.push(`- ${s.session}${branchStr} · ${previewOf(s.summary, Math.min(previewMax, 100))}${ageStr}`);
+          // high effort: also list up to 3 recent files for this peer
+          if (effort === "high" && s.recent_files.length > 0) {
+            const recentSlice = s.recent_files.slice(0, 3).map((p) => shortPath(p));
+            lines.push(`    edits: ${recentSlice.join(", ")}`);
+          }
+        }
       } else {
         lines.push(`- ${s.session} @ ${shortPath(s.cwd)}${marker}`);
       }

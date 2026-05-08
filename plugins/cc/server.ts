@@ -191,6 +191,33 @@ const ANNOUNCE_WINDOW_MS = envInt("CC_ANNOUNCE_WINDOW_MS", 30 * 60 * 1000);
 const OVERLAP_WINDOW_MS = envInt("CC_OVERLAP_WINDOW_MS", 10 * 60 * 1000);
 const MSG_TTL_MS = envInt("CC_MSG_TTL_MS", 6 * 60 * 60 * 1000);
 
+// --- v3.5 observability ---
+// CC_DEBUG=1   → emit structured stderr trace at each phase. zero overhead
+//               when off (the trace() function early-returns on a single
+//               boolean check). lines have shape:
+//                 [cc.trace] ts=<ms> sid=<short> phase=<name> ms=<dur> ...
+// CC_TRACE_SQL=1 → wrap critical sqlite operations with timing. emits via
+//                 trace() under phase=sql.<name>. captures slow queries.
+//
+// trace() and readEffort() are defined further down (after MY_SHORT_ID is
+// resolved) to avoid TDZ. The flags are module-scope so the rest of the
+// file can branch on them.
+const CC_DEBUG = process.env.CC_DEBUG === "1" || process.env.CC_DEBUG === "true";
+const CC_TRACE_SQL =
+  process.env.CC_TRACE_SQL === "1" || process.env.CC_TRACE_SQL === "true";
+
+// CLAUDE_EFFORT resolution for digest verbosity (#68, CC 2.1.133+).
+// CC 2.1.133 propagates $CLAUDE_EFFORT to Bash subprocess env and hooks.
+// Whether it reaches MCP child env varies — fall back to 'medium' on
+// missing/invalid values. Hooks read effort.level from JSON input
+// independently; this is the env-only path the renderer uses.
+type Effort = "low" | "medium" | "high";
+function readEffort(): Effort {
+  const raw = (process.env.CLAUDE_EFFORT || "").toLowerCase();
+  if (raw === "low" || raw === "medium" || raw === "high") return raw;
+  return "medium";
+}
+
 // --- bootstrap fs state ---
 
 for (const d of [CC_DIR, INBOX_DIR, TOPICS_DIR, QUESTIONS_DIR]) {
@@ -212,6 +239,48 @@ const db = openDb(DB_PATH);
 
 const MY_SHORT_ID = MY_SESSION_ID ? MY_SESSION_ID.slice(0, 8) : "";
 const MY_CWD_BASENAME = path.basename(MY_CWD) || MY_SHORT_ID;
+
+// --- v3.5 trace helpers (defined after MY_SHORT_ID for TDZ-safety) ---
+// trace(phase, data?) emits a single stderr line under CC_DEBUG. data may
+// be a number (ms) or a key-value record. zero cost when CC_DEBUG is off.
+function trace(phase: string, data?: Record<string, unknown> | number): void {
+  if (!CC_DEBUG) return;
+  const ts = Date.now();
+  const sid = MY_SHORT_ID || "----";
+  let payload: string;
+  if (typeof data === "number") {
+    payload = `ms=${data}`;
+  } else if (data) {
+    try {
+      payload = Object.entries(data)
+        .map(([k, v]) => `${k}=${typeof v === "string" ? v : JSON.stringify(v)}`)
+        .join(" ");
+    } catch {
+      payload = "data=<unserializable>";
+    }
+  } else {
+    payload = "";
+  }
+  process.stderr.write(`[cc.trace] ts=${ts} sid=${sid} phase=${phase} ${payload}\n`);
+}
+
+// Wrap a sync operation with phase + timing trace. Use for action handlers,
+// sweeps, identity resolution. Wrapping every db call adds noise — prefer
+// inline trace() at coarse phase boundaries.
+function traced<T>(phase: string, fn: () => T): T {
+  if (!CC_DEBUG) return fn();
+  const t0 = Date.now();
+  try {
+    const result = fn();
+    trace(phase, { ms: Date.now() - t0 });
+    return result;
+  } catch (err) {
+    trace(phase, { ms: Date.now() - t0, error: err instanceof Error ? err.message : String(err) });
+    throw err;
+  }
+}
+
+trace("boot", { my_short: MY_SHORT_ID, kind: MY_KIND, cwd: MY_CWD });
 
 // --- git context (branch + worktree root + project root) ---
 // Resolved at session start and refreshed on heartbeat. Populates the
@@ -532,6 +601,16 @@ const liveSessionsCache = new TTLCache<"all", LiveSessionRow[]>(200);
 
 function liveSessions(): LiveSessionRow[] {
   return liveSessionsCache.get("all", () => {
+    const _sqlT0 = CC_TRACE_SQL ? Date.now() : 0;
+    const result = liveSessionsImpl();
+    if (CC_TRACE_SQL) {
+      trace("sql.liveSessions", { ms: Date.now() - _sqlT0, count: result.length });
+    }
+    return result;
+  });
+}
+
+function liveSessionsImpl(): LiveSessionRow[] {
     const native = nativeLiveSessions();
     if (native.length === 0) {
       // No native session files visible (unusual layout). Fall back to
@@ -590,7 +669,6 @@ function liveSessions(): LiveSessionRow[] {
         branch: null,
       };
     });
-  });
 }
 
 // Project-scoped filter: keep peers in my project_root. If I'm in a non-git
@@ -1360,6 +1438,7 @@ const LEGACY_TOOL_NAMES: Record<string, ActionName> = {
 };
 
 server.setRequestHandler(CallToolRequestSchema, async (req) => {
+  const _handlerT0 = CC_DEBUG ? Date.now() : 0;
   // Build the discriminator-keyed payload regardless of which tool name the
   // client sent. New clients call 'cc' with action=...; old clients call
   // cc_<verb> and we synthesize the action field here.
@@ -1378,9 +1457,11 @@ server.setRequestHandler(CallToolRequestSchema, async (req) => {
 
   const parsed = parseAction(raw);
   if (!parsed.ok) {
+    trace("action.parse_error", { errors: parsed.errors.join(";") });
     return errorText(`cc: ${parsed.errors.join("; ")}`);
   }
   const action: Action = parsed.action;
+  trace("action.dispatch", { verb: action.action });
 
   if (!MY_SESSION_ID && action.action !== "sessions") {
     return errorText("cc: CLAUDE_CODE_SESSION_ID not set; most verbs disabled.");
@@ -1569,7 +1650,9 @@ server.setRequestHandler(CallToolRequestSchema, async (req) => {
       now(),
       MY_SESSION_ID,
     );
-    const rendered = renderDigest(digest);
+    const effort = readEffort();
+    trace("action.check", { since_ms: sinceMs ?? null, scope: action.scope ?? "project", effort });
+    const rendered = renderDigest(digest, effort);
     return text(rendered || "(no new cc activity)");
   }
 
@@ -1580,6 +1663,7 @@ server.setRequestHandler(CallToolRequestSchema, async (req) => {
   return errorText("cc: unreachable action branch");
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
+    trace("action.error", { verb: action.action, ms: CC_DEBUG ? Date.now() - _handlerT0 : 0, msg });
     process.stderr.write(`cc.${action.action}: ${msg}\n`);
     return errorText(`cc.${action.action} failed: ${msg}`);
   }
