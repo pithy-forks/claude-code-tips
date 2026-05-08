@@ -8,6 +8,28 @@ All notable changes to the cc plugin are documented here. The format follows
 
 ## [Unreleased]
 
+## [3.8.0] — 2026-05-08
+
+### Changed
+- **`SKILL.md` smart routing.** v3.6 routed all reads to bash unconditionally,
+  which made restarted terminals (where the MCP tool IS registered) still
+  see `Bash(sqlite3 ...)` traces instead of `cc(action=...)`. v3.8 routes
+  by tool availability:
+  - If `mcp__cc__cc` is in the model's tool list → use the MCP path for
+    every verb (typed args, exfil guard, `digest_delta`, `subscription_matches`).
+  - Else (install-trigger session only) → fall back to `bin/cc-quick` bash
+    helper, silently. Don't tell the user it's a "fallback."
+- The bash path stays exactly as v3.6 documented; only the routing
+  decision in SKILL.md changes.
+
+### Why
+After `/plugin install` + `/reload-plugins`, only the install-trigger
+session lacks the MCP tool. Every other session has it. v3.6's
+"bash is the fast path" framing was over-aggressive — it cost typed
+validation + delta cursor advancement in sessions that didn't need
+the bash workaround. v3.8 makes the MCP path the default again, while
+keeping the bash escape hatch silent for the one session that needs it.
+
 ## [3.7.0] — 2026-05-08
 
 ### Removed (pre-v3 + dead code purge)

@@ -1,6 +1,6 @@
 {
   "name": "cc",
-  "version": "3.7.0",
+  "version": "3.8.0",
   "description": "Session mesh for Claude Code. Email-cc semantics: every session stays informed of what its siblings are doing, with file-overlap alerts that prevent two agents silently clobbering the same file.",
   "author": { "name": "Ani Potts", "url": "https://github.com/anipotts" },
   "repository": "https://github.com/anipotts/claude-code-tips",
