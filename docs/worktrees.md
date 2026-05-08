@@ -23,6 +23,24 @@ claude code uses worktrees for agent isolation. when you spawn a subagent with `
 
 ---
 
+
+
+### worktree.baseRef setting (v2.1.133+)
+
+by default, new worktrees branch from `origin/<default-branch>` (the fresh remote state). set `worktree.baseRef: "head"` in your settings to branch from local `HEAD` instead (keeps unpushed commits in new worktrees).
+
+add to `~/.claude/settings.json` or `.claude/settings.json`:
+
+```json
+{
+  "worktree": {
+    "baseRef": "head"
+  }
+}
+```
+
+this matters if you have local commits not yet pushed. the default changed in v2.1.133; if you relied on the old behavior (local HEAD), set `baseRef: "head"` to keep it.
+
 ## why worktrees matter for claude code
 
 without worktrees, parallel agents would step on each other -- editing the same files, creating merge conflicts, corrupting each other's work. worktrees give each agent its own sandbox.

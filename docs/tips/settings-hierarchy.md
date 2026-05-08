@@ -16,6 +16,22 @@ they merge in that order. local overrides project overrides global.
 
 
 
+
+
+### worktree configuration (v2.1.133+)
+
+add a `worktree` section to control how new worktrees are created:
+
+```json
+{
+  "worktree": {
+    "baseRef": "fresh"  // or "head" to keep unpushed local commits
+  }
+}
+```
+
+default is `fresh` (branches from `origin/<default>`). set to `head` if you want new worktrees to include unpushed local commits.
+
 ### migration note: ~/.claude.json → settings.json (v2.1.119+)
 
 starting v2.1.119, display settings moved from `~/.claude.json` to the settings.json scope:
