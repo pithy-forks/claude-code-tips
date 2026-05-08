@@ -8,6 +8,34 @@ All notable changes to the cc plugin are documented here. The format follows
 
 ## [Unreleased]
 
+## [3.6.0] — 2026-05-08
+
+### Added
+- **`bin/cc-quick` — direct cc state access without MCP.** Bash + sqlite3
+  helper that reads `~/.claude/channels/cc/sessions.db` and writes
+  `inbox/<sid>/*.msg` files atomically. Always works regardless of MCP
+  tool registration state. Verbs: `roster`, `send`, `announce`, `check`,
+  `mine`. ~150 LOC, no dependencies beyond `bash`/`sqlite3`/`uuidgen`.
+
+### Changed
+- **`SKILL.md` reframes the path hierarchy.** sqlite + filesystem direct
+  access is now the FAST PATH, not a fallback. MCP is documented as
+  the typed/validated path that's optimal when available but never
+  required. Each verb explicitly lists which path is faster.
+- **`send` no longer requires MCP.** The recipient's cc-server
+  `inbox-watch` FSWatcher dispatches the channel push notification on
+  ANY new `.msg` file landing, regardless of who wrote it. Direct
+  bash writes via `cc-quick send` produce identical recipient-side
+  behavior to MCP send.
+
+### Why
+Real-world feedback: in the install-trigger session (the terminal that
+ran `/plugin install`), the cc MCP tool isn't reachable until that
+terminal restarts (CC harness doesn't re-poll `tools/list` mid-session).
+The previous SKILL.md framed sqlite as a "fallback" which made users
+feel the install-trigger session was second-class. v3.6 treats both
+paths as first-class with explicit per-verb routing.
+
 ## [3.5.0] — 2026-05-08
 
 ### Added
