@@ -1,0 +1,3 @@
+# Per-run log dirs are large and ephemeral. Keep the .gitkeep.
+logs/*
+!logs/.gitkeep
