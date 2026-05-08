@@ -5,16 +5,11 @@
 import * as os from "node:os";
 
 // v3.5: digest verbosity tunes by $CLAUDE_EFFORT (CC 2.1.133+).
-//   low    — single-line peers, no summary parenthetical, drop topic_unread
-//            previews to titles only, message previews capped at 80 chars.
+//   low    — single-line peers, no summary parenthetical, message previews
+//            capped at 80 chars.
 //   medium — default; current shape (one line per peer with summary suffix).
 //   high   — peers expand to show up to 3 recent_files; full announce body
-//            (no preview cap); topic_unread shows full message previews.
-//
-// effort source priority for the renderer (resolved by callers, passed in):
-//   1. action call's stored effort (per-session) if present
-//   2. process.env.CLAUDE_EFFORT (Bash subprocess — CC 2.1.133+)
-//   3. fallback 'medium'
+//            (no preview cap).
 //
 // renderer is a pure function; effort is a parameter, not read from env here.
 export type Effort = "low" | "medium" | "high";
@@ -30,13 +25,6 @@ export type DirectMsg = {
   subject: string;
   preview: string;
   urgency: "low" | "normal" | "urgent" | "question";
-  age_s: number;
-};
-
-export type TopicMsg = {
-  from: string;
-  subject: string;
-  preview: string;
   age_s: number;
 };
 
@@ -70,24 +58,12 @@ export type OverlapAlert = {
   reason: "same-branch" | "same-worktree" | "same-branch+worktree";
 };
 
-export type QuestionAwaitingMe = {
-  id: string;
-  from: string;
-  question: string;
-  options?: string[];
-  age_s: number;
-  blocking: boolean;
-};
-
 export type Digest = {
   is_delta: boolean;
   active_session_count: number;
   direct_unread: DirectMsg[];
-  topic_unread: Record<string, TopicMsg[]>;
   session_digests: SessionDigest[];
   file_overlap_alerts: OverlapAlert[];
-  questions_awaiting_me: QuestionAwaitingMe[];
-  my_open_questions: Array<{ id: string; to?: string | null; topic?: string | null; age_s: number }>;
 };
 
 const HOME = os.homedir();
@@ -113,10 +89,8 @@ function previewOf(s: string, max = 140): string {
 export function renderDigest(d: Digest, effort: Effort = "medium"): string {
   const empty =
     d.direct_unread.length === 0 &&
-    Object.keys(d.topic_unread).length === 0 &&
     d.session_digests.length === 0 &&
-    d.file_overlap_alerts.length === 0 &&
-    d.questions_awaiting_me.length === 0;
+    d.file_overlap_alerts.length === 0;
   if (empty) return "";
 
   const previewMax = PREVIEW_BY_EFFORT[effort];
@@ -131,31 +105,6 @@ export function renderDigest(d: Digest, effort: Effort = "medium"): string {
       const subj = m.subject ? `"${m.subject}"` : "";
       const tag = m.urgency !== "normal" ? `, ${m.urgency}` : "";
       lines.push(`- ${m.from} (${formatAge(m.age_s)}${tag}) ${subj}: ${previewOf(m.preview, previewMax)}`);
-    }
-  }
-
-  const topics = Object.keys(d.topic_unread);
-  if (topics.length > 0) {
-    lines.push("");
-    for (const t of topics) {
-      const msgs = d.topic_unread[t];
-      lines.push(`topic ${t} (${msgs.length} new):`);
-      // low effort: titles only, no body previews
-      if (effort === "low") continue;
-      for (const m of msgs) {
-        const subj = m.subject ? `"${m.subject}"` : "";
-        lines.push(`- ${m.from} (${formatAge(m.age_s)}) ${subj}: ${previewOf(m.preview, previewMax)}`);
-      }
-    }
-  }
-
-  if (d.questions_awaiting_me.length > 0) {
-    lines.push("");
-    lines.push("questions awaiting you:");
-    for (const q of d.questions_awaiting_me) {
-      const opts = q.options && q.options.length > 0 ? ` options: ${q.options.join(" / ")}` : "";
-      const blocker = q.blocking ? " [blocking]" : "";
-      lines.push(`- ${q.id} from ${q.from}${blocker}: ${previewOf(q.question, Math.max(previewMax, 200))}${opts}`);
     }
   }
 

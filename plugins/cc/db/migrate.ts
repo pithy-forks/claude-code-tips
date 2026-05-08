@@ -84,36 +84,6 @@ function applyAdditiveColumns(
   }
 }
 
-/**
- * Migrate cc state from the v2 location (~/.claude/cc/) to the v3 location
- * (~/.claude/channels/cc/) -- aligns with the imessage plugin's
- * ~/.claude/channels/imessage/ convention. Idempotent and safe to run on every
- * server start: noop if the new dir already exists or the legacy dir is absent.
- *
- * Strategy: rename the whole legacy directory in one atomic step. The sqlite
- * WAL companion files (-shm, -wal) follow because they live in the same dir.
- * A symlink is left at the old path so any external tooling still pointing at
- * it keeps working until the user removes the symlink manually.
- */
-export function migrateLegacyStateDir(legacy: string, target: string): void {
-  if (fs.existsSync(target)) return;
-  if (!fs.existsSync(legacy)) return;
-  // If legacy is already a symlink (e.g. previous migration), don't loop.
-  try {
-    if (fs.lstatSync(legacy).isSymbolicLink()) return;
-  } catch {
-    return;
-  }
-  fs.mkdirSync(path.dirname(target), { recursive: true });
-  try {
-    fs.renameSync(legacy, target);
-    fs.symlinkSync(target, legacy);
-    process.stderr.write(
-      `cc: migrated state dir ${legacy} -> ${target} (symlink left at old path)\n`,
-    );
-  } catch (err) {
-    process.stderr.write(
-      `cc: state-dir migration ${legacy} -> ${target} failed: ${err}\n`,
-    );
-  }
-}
+// Pre-v3 ~/.claude/cc/ → ~/.claude/channels/cc/ migration was removed in
+// v3.6. Anyone on v2 has long since upgraded; the dead-code maintenance
+// burden wasn't worth keeping.

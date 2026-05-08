@@ -25,7 +25,7 @@ import * as path from "node:path";
 import * as os from "node:os";
 import { randomBytes } from "node:crypto";
 
-import { openDb, migrateLegacyStateDir } from "./db/migrate.js";
+import { openDb } from "./db/migrate.js";
 import { renderDigest, type Digest } from "./lib/render.js";
 import {
   ACTION_JSON_SCHEMA,
@@ -64,13 +64,10 @@ const CLAUDE_DIR =
   process.env.CLAUDE_CONFIG_DIR || path.join(os.homedir(), ".claude");
 // v3: state lives under channels/<plugin> to align with the imessage plugin's
 // ~/.claude/channels/imessage/ convention. CC_STATE_DIR overrides for tests.
-// The legacy ~/.claude/cc/ path migrates automatically on first start (see
-// db/migrate.ts:migrateLegacyStateDir) -- a symlink stays at the old path so
-// any external tooling pointing there keeps working.
-const LEGACY_CC_DIR = path.join(CLAUDE_DIR, "cc");
+// Pre-v3 ~/.claude/cc/ migration was dropped in v3.6 — anyone on v2 has
+// long since upgraded.
 const CC_DIR =
   process.env.CC_STATE_DIR || path.join(CLAUDE_DIR, "channels", "cc");
-migrateLegacyStateDir(LEGACY_CC_DIR, CC_DIR);
 const SESSIONS_DIR = path.join(CLAUDE_DIR, "sessions");
 const INBOX_DIR = path.join(CC_DIR, "inbox");
 const TOPICS_DIR = path.join(CC_DIR, "topics");
@@ -170,10 +167,8 @@ const MY_KIND = MY_IDENTITY.kind;
 const MY_PID = process.pid;
 
 // --- env-driven config ---
-// Each constant has a sensible default; advanced users override via env. The
-// imessage plugin treats config as boundary state -- code reads it once at
-// boot, never mid-call. Same here. CC_STATIC_MODE pins all of these to their
-// values at boot and refuses any runtime mutation that would change them.
+// Each constant has a sensible default; advanced users override via env.
+// Config is boundary state -- read once at boot, never mid-call.
 function envInt(name: string, fallback: number): number {
   const raw = process.env[name];
   if (!raw) return fallback;
@@ -185,7 +180,6 @@ function envInt(name: string, fallback: number): number {
   return n;
 }
 
-const STATIC_MODE = process.env.CC_STATIC_MODE === "true";
 const STALE_SESSION_AFTER_MS = envInt("CC_STALE_SESSION_MS", 5 * 60 * 1000);
 const ANNOUNCE_WINDOW_MS = envInt("CC_ANNOUNCE_WINDOW_MS", 30 * 60 * 1000);
 const OVERLAP_WINDOW_MS = envInt("CC_OVERLAP_WINDOW_MS", 10 * 60 * 1000);
@@ -747,16 +741,6 @@ function synthesizePeerSummary(
   return "(idle)";
 }
 
-// Topics dropped from the v3 user surface; subscriptionsFor is retained for
-// any future opt-in topic UX. Today nothing reads it.
-function subscriptionsFor(sid: string): string[] {
-  return (
-    db
-      .prepare(`SELECT topic FROM subscriptions WHERE session_id = ?`)
-      .all(sid) as Array<{ topic: string }>
-  ).map((r) => r.topic);
-}
-
 function atomicWrite(dir: string, filename: string, body: string): void {
   fs.mkdirSync(dir, { recursive: true });
   const tmp = path.join(dir, `.${filename}.tmp`);
@@ -904,14 +888,6 @@ function computeDigest(opts: { since_ms?: number | null; scope?: "project" | "gl
   }
   directUnread.sort((a, b) => b.created_at_ms - a.created_at_ms);
 
-  // v3: topic_unread is intentionally always empty. The schema retains
-  // topics/subscriptions for a future opt-in topic UX, but the current digest
-  // surface is DM-only (direct_unread + session_digests + file_overlap_alerts).
-  const topicUnread: Record<
-    string,
-    Array<{ from: string; subject: string; preview: string; age_s: number }>
-  > = {};
-
   // session_digests: one per live peer. v3 identity = "<short-id> @ <cwd-basename>"
   // ('name' column is retained but no longer auto-populated; if a future
   // rename verb writes to it, prefer the user-set name when present.)
@@ -1040,21 +1016,14 @@ function computeDigest(opts: { since_ms?: number | null; scope?: "project" | "gl
     overlapAlerts.sort((a, b) => a.file.localeCompare(b.file));
   }
 
-  // questions (schema shipped; not returned in 2.0.0 beyond structure)
-  const questionsAwaitingMe: Digest["questions_awaiting_me"] = [];
-  const myOpenQuestions: Digest["my_open_questions"] = [];
-
   const directForDigest = directUnread.map(({ created_at_ms: _, ...rest }) => rest);
 
   return {
     is_delta: isDelta,
     active_session_count: peers.length,
     direct_unread: directForDigest,
-    topic_unread: topicUnread,
     session_digests: sessionDigests,
     file_overlap_alerts: overlapAlerts,
-    questions_awaiting_me: questionsAwaitingMe,
-    my_open_questions: myOpenQuestions,
   };
 }
 
@@ -1427,31 +1396,13 @@ function assertNotChannelState(value: unknown, fieldHint: string): void {
   }
 }
 
-// Legacy tool names accepted for one release cycle (cc 3.0.x callers).
-// Maps cc_<verb> -> <verb>. The args from the legacy call are passed through
-// unmodified; we just inject the action discriminator.
-const LEGACY_TOOL_NAMES: Record<string, ActionName> = {
-  cc_sessions: "sessions",
-  cc_send: "send",
-  cc_announce: "announce",
-  cc_check: "check",
-};
-
 server.setRequestHandler(CallToolRequestSchema, async (req) => {
   const _handlerT0 = CC_DEBUG ? Date.now() : 0;
-  // Build the discriminator-keyed payload regardless of which tool name the
-  // client sent. New clients call 'cc' with action=...; old clients call
-  // cc_<verb> and we synthesize the action field here.
+  // Single tool surface: 'cc' with action-discriminated args. Pre-v3 callers
+  // (cc_sessions/cc_send/cc_announce/cc_check) were dropped in v3.6 — the
+  // grace period across v3.0 → v3.5 is well past.
   let raw = (req.params.arguments ?? {}) as Record<string, unknown>;
-  if (req.params.name === "cc") {
-    // already discriminated; raw is { action, ...args }
-  } else if (req.params.name in LEGACY_TOOL_NAMES) {
-    const a = LEGACY_TOOL_NAMES[req.params.name];
-    process.stderr.write(
-      `cc: legacy tool '${req.params.name}' is deprecated; switch to 'cc' with action='${a}'. (Will be removed in v3.2.)\n`,
-    );
-    raw = { action: a, ...raw };
-  } else {
+  if (req.params.name !== "cc") {
     return errorText(`unknown tool '${req.params.name}'. Use 'cc' with action=...`);
   }
 

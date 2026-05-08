@@ -9,7 +9,6 @@ function fixture(overrides: Partial<Digest> = {}): Digest {
     is_delta: false,
     active_session_count: 1,
     direct_unread: [],
-    topic_unread: {},
     session_digests: [
       {
         session: "abcd1234",
@@ -27,8 +26,6 @@ function fixture(overrides: Partial<Digest> = {}): Digest {
       },
     ],
     file_overlap_alerts: [],
-    questions_awaiting_me: [],
-    my_open_questions: [],
     ...overrides,
   };
 }
@@ -77,29 +74,10 @@ describe("renderDigest effort verbosity", () => {
     expect(med.length).toBeLessThan(high.length);
   });
 
-  test("low drops topic_unread previews to titles only", () => {
-    const withTopics = fixture({
-      topic_unread: {
-        "#auth": [
-          { from: "peer1", subject: "review", preview: "this is a long preview that should normally show", age_s: 60 },
-          { from: "peer2", subject: "thoughts", preview: "another long body", age_s: 30 },
-        ],
-      },
-    });
-    const low = renderDigest(withTopics, "low");
-    const med = renderDigest(withTopics, "medium");
-    expect(med).toContain("long preview");
-    expect(low).not.toContain("long preview");
-    expect(low).toContain("topic #auth");
-  });
-
   test("invalid/missing effort defaults to medium", () => {
     const out1 = renderDigest(fixture());
     // @ts-expect-error invalid effort intentionally
     const out2 = renderDigest(fixture(), "invalid");
-    // 'medium' default + unknown coerces via PREVIEW_BY_EFFORT undefined.
-    // unknown will produce different chars/length; the contract is that
-    // valid 'medium' renders cleanly and matches the default.
     expect(out1).toContain("abcd1234");
     expect(out2.length).toBeGreaterThan(0);
   });
@@ -109,11 +87,8 @@ describe("renderDigest effort verbosity", () => {
       is_delta: false,
       active_session_count: 0,
       direct_unread: [],
-      topic_unread: {},
       session_digests: [],
       file_overlap_alerts: [],
-      questions_awaiting_me: [],
-      my_open_questions: [],
     };
     expect(renderDigest(empty, "low")).toBe("");
     expect(renderDigest(empty, "medium")).toBe("");
