@@ -8,6 +8,22 @@ All notable changes to the cc plugin are documented here. The format follows
 
 ## [Unreleased]
 
+## [3.5.0] — 2026-05-08
+
+### Added
+- **#68 — digest verbosity by `$CLAUDE_EFFORT` (CC 2.1.133+).** `cc(action='check')`
+  output now tunes by the active effort level read from `process.env.CLAUDE_EFFORT`:
+  - `low` — single-line peers, no summary parenthetical, topic_unread titles only,
+    message previews capped at 80 chars.
+  - `medium` (default) — current shape; `<short> <branch> · <summary> (<age>)`.
+  - `high` — adds an `edits: <recent files>` line per peer, message previews up
+    to 240 chars, full announce body.
+- **Observability via `CC_DEBUG=1`** — emits structured stderr trace lines at boot,
+  action dispatch, and on action errors. Format: `[cc.trace] ts=<ms> sid=<short> phase=<name> ...`.
+  Zero overhead when off.
+- **`CC_TRACE_SQL=1`** — wraps the `liveSessions` query (the hottest read path) with
+  timing under `phase=sql.liveSessions`. More query coverage in subsequent PRs.
+
 ## [3.4.0] — 2026-05-07
 
 ### Added
