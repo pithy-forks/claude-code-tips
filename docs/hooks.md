@@ -235,5 +235,5 @@ hooks should be:
 
 ## further reading
 
-- [hooks directory](../hooks/) -- all 11 hook scripts with full source
+- [hooks directory](../hooks/) -- all 9 hook scripts with full source
 - [official hooks docs](https://docs.anthropic.com/en/docs/claude-code/hooks) -- complete reference
