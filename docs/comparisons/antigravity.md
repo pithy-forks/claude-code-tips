@@ -10,14 +10,7 @@
 
 | feature | claude code | google antigravity |
 |---------|------------|-------------------|
-| pricing | free tier / $20 pro / $100 max 5x / $200 max 20x per month | free (public preview) -- future pricing TBD |
-| model | opus 4.6, sonnet 4.6, haiku 4.5 | gemini 3.1 pro, gemini 3 flash, claude sonnet 4.6, claude opus 4.6, GPT-OSS 120B |
-| interface | terminal CLI, VS Code, JetBrains | standalone IDE (VS Code fork) with manager view |
-| agentic mode | yes (native -- always agentic) | yes (agent-first -- parallel autonomous agents) |
-| tab completion | no | yes -- inline completions |
-| extensibility | hooks, plugins, skills, agents, commands, MCP servers | agent skills, MCP (google cloud), early-stage |
-| open source | yes ([anthropics/claude-code](https://github.com/anthropics/claude-code)) | no |
-| owner | anthropic | google (built by former windsurf team within google deepmind) |
+| pricing | free tier / $20 pro / $100 max 5x / $200 max 20x per month | **verify current status at [antigravity.google/pricing](https://antigravity.google/pricing)** -- was free during public preview, post-preview pricing TBD |
 
 ### background
 

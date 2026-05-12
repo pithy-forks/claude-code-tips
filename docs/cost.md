@@ -80,7 +80,9 @@ this env var is sent as `X-Amzn-Bedrock-Service-Tier` header on all requests. on
 
 ## model pricing (may 2026)
 
-> [current pricing](https://docs.anthropic.com/en/docs/about-claude/models) - last verified may 2026, may have changed. check official pricing for v2.1.122+ rates.
+## model pricing
+
+> **always reference [anthropic pricing](https://docs.anthropic.com/en/docs/about-claude/models) for current rates.** this repo's prices snapshot frequently and go stale. last verified may 2026 but anthropic updates pricing regularly.
 
 ## model pricing (may 2026)
 
