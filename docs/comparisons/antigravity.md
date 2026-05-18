@@ -18,7 +18,7 @@ google antigravity launched november 2025 alongside the gemini 3 model family. i
 
 antigravity is currently in **public preview** and free for individual users. google has not announced post-preview pricing.
 
----
+antigravity's status post-public-preview is unconfirmed as of may 2026. during preview it was free. **verify current pricing and availability at [antigravity.google/pricing](https://antigravity.google/pricing) before recommending.**
 
 ## where claude code wins
 
