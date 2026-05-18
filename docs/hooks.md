@@ -51,6 +51,11 @@ PreToolUse hooks (safety-guard, no-squash) fire on every Bash call -- 10K+ times
 
 ---
 
+
+
+### hook performance notes (v2.1.140+)
+PreToolUse hooks on Bash commands need to complete in <50ms to avoid user-facing latency. the hooks listed above are optimized for speed -- they use jq for JSON parsing and regex for pattern matching rather than spawning subprocesses. profile your custom hooks with `time` if you add new ones.
+
 ## what hooks actually prevent
 
 three categories of damage:
