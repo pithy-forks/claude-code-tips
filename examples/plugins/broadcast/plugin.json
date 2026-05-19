@@ -1,4 +1,5 @@
 {
+  "_comment": "tested with claude code v2.1.143",
   "name": "broadcast",
   "version": "0.1.0",
   "description": "async notifications when claude ships something. slack, discord, wherever. fire and forget",
