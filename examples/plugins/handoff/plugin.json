@@ -1,4 +1,5 @@
 {
+  "_comment": "tested with claude code v2.1.143",
   "name": "handoff",
   "version": "0.1.0",
   "description": "saves your context before claude compresses it. the one hook everyone needs",
