@@ -213,3 +213,33 @@ the prompt is everything bc the agent can't ask follow-up questions:
 
 - [example agents](../examples/agents/) -- watch-tests, try-worktree, arch-review, write-pr
 - [official docs](https://docs.anthropic.com/en/docs/claude-code/sub-agents) -- subagent reference
+
+---
+
+## pattern 4: agent teams (v2.1.145+)
+
+Agent Teams run multiple subagents in parallel with a unified manager. each teammate has its own context and role. they coordinate through task assignments from the manager session.
+
+```json
+{
+  "agents": [
+    {
+      "prompt": "explore the authentication layer. map all auth patterns, list files.",
+      "description": "auth explorer",
+      "model": "claude-haiku-4-5"
+    },
+    {
+      "prompt": "explore the database layer. find all query patterns, ORM usage, schemas.",
+      "description": "database explorer",
+      "model": "claude-haiku-4-5"
+    },
+    {
+      "prompt": "explore API routes. list all endpoints, HTTP methods, handlers, middleware.",
+      "description": "api explorer",
+      "model": "claude-haiku-4-5"
+    }
+  ]
+}
+```
+
+spawn all three simultaneously. they work in parallel without blocking each other. the manager session receives reports as each completes. use Agent Teams for parallel exploration where independent agents would otherwise queue sequentially.

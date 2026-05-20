@@ -44,6 +44,28 @@ PostToolUse hooks can now replace tool output before claude sees it. return `{"h
 
 use case: filter sensitive output (API keys, internal IPs), normalize error messages, add context. example: a bash hook that catches test failures and appends a link to the failing test file in your CI dashboard.
 
+
+
+### Stop and SubagentStop hook fields (v2.1.145+)
+
+Stop and SubagentStop hooks now receive additional context about background tasks and session crons:
+
+```bash
+#!/usr/bin/env bash
+INPUT=$(cat)
+BACKGROUND_TASKS=$(echo "$INPUT" | jq -r '.background_tasks // []')
+SESSION_CRONS=$(echo "$INPUT" | jq -r '.session_crons // []')
+
+# react to active background work when session ends
+if [[ $(echo "$BACKGROUND_TASKS" | jq 'length') -gt 0 ]]; then
+  echo "warning: background tasks still running, check status before exiting"
+  exit 1
+fi
+exit 0
+```
+
+use this to warn before stopping a session with active background work, or to log task completion state.
+
 ### mcp_tool event hooks (v2.1.126+)
 
 MCP tool handlers can now be invoked from hooks using the `mcp_tool` type with event-driven logic. this lets you intercept and react to MCP calls without spinning up a shell or http process.
