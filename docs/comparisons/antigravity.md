@@ -20,6 +20,10 @@ antigravity is currently in **public preview** and free for individual users. go
 
 antigravity's status post-public-preview is unconfirmed as of may 2026. during preview it was free. **verify current pricing and availability at [antigravity.google/pricing](https://antigravity.google/pricing) before recommending.**
 
+
+
+**status update (may 26 2026)**: verify current pricing and preview status at [antigravity.google/pricing](https://antigravity.google/pricing) -- public preview terms may have changed since april verification.
+
 ## where claude code wins
 
 ### terminal-first workflow
