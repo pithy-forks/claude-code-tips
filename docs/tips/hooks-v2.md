@@ -6,6 +6,8 @@ hooks come in five flavors now (v2.1.118 added `mcp_tool`). pick the wrong one a
 
 ## the five types
 
+### the five types
+
 | type | what it is | timeout | cost | best for |
 |------|-----------|---------|------|----------|
 | `command` | shell script, receives JSON on stdin | 600s | free | safety checks, logging, file ops |
@@ -14,7 +16,22 @@ hooks come in five flavors now (v2.1.118 added `mcp_tool`). pick the wrong one a
 | `agent` | subagent with full tool access (Read, Grep, Glob) | 60s | expensive | complex decisions that need file reads |
 | `mcp_tool` (v2.1.118+) | directly invoke an MCP tool on a connected server | 60s | free (no child process) | hook work that an MCP server already owns the state for |
 
+### effort.level in hooks (v2.1.133+)
 
+all hooks now receive the active effort setting via two channels:
+
+- **JSON input**: `effort.level` field (one of: `low`, `medium`, `high`, `xhigh`, `max`)
+- **Bash environment**: `$CLAUDE_EFFORT` variable
+
+use this to adjust hook behavior based on effort mode. example: safety-guard might be stricter at `low` effort but more permissive at `max`.
+
+### PostToolUse output replacement (v2.1.121+)
+
+PostToolUse hooks can replace tool output before claude sees it. return `{"hookSpecificOutput": {"PostToolUse": {"updatedToolOutput": "your replacement"}}}` to modify what claude receives. use case: filter sensitive output, normalize error messages, add context.
+
+### Stop and SubagentStop context (v2.1.145+)
+
+Stop and SubagentStop hooks now receive `background_tasks` and `session_crons` fields. use this to warn before exiting with active background work or log task completion state.
 
 ### effort level in hooks (v2.1.133+)
 

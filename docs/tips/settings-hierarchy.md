@@ -50,6 +50,22 @@ if you have `~/.claude.json`, these settings still work but are deprecated. migr
 
 if you're using claude code through an embedding host platform (IDE plugin, platform integration), `CLAUDE_CODE_PROVIDER_MANAGED_BY_HOST` will be set by the host. when this env var is present, provider/auth settings in `.claude/settings.json` are ignored -- the host manages authentication instead. this prevents config conflicts between user settings and platform-managed auth.
 
+
+
+### new in v2.1.133: worktree baseRef setting
+
+by default, new worktrees branch from `origin/<default-branch>` (fresh remote state). set `worktree.baseRef: "head"` to branch from local `HEAD` instead, preserving unpushed commits in new worktrees.
+
+```json
+{
+  "worktree": {
+    "baseRef": "head"
+  }
+}
+```
+
+this setting changed default behavior in v2.1.133. if you relied on old behavior (local HEAD), set it explicitly.
+
 ## when to use which
 
 | setting | where | why |
