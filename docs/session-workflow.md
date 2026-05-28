@@ -14,6 +14,10 @@ on launch, claude code loads CLAUDE.md from the project root, reads any `.claude
 
 by the time you see the prompt, hooks are loaded, context is cached, and claude knows your conventions.
 
+
+
+if you see a notice about npm global install not auto-updating, run `/doctor` to see the fix. this was added in v2.1.153 to help diagnose update issues.
+
 ## context loading
 
 three things work together on startup:
