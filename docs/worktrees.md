@@ -23,8 +23,6 @@ claude code uses worktrees for agent isolation. when you spawn a subagent with `
 
 ---
 
-
-
 ### worktree.baseRef setting (v2.1.133+)
 
 by default, new worktrees branch from `origin/<default-branch>` (the fresh remote state). set `worktree.baseRef: "head"` in your settings to branch from local `HEAD` instead (keeps unpushed commits in new worktrees).
