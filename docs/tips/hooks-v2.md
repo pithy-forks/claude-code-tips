@@ -6,6 +6,17 @@ hooks come in five flavors now (v2.1.118 added `mcp_tool`). pick the wrong one a
 
 ## the five types
 
+
+
+### safety prompts for sensitive file writes (v2.1.160+)
+
+v2.1.160 added prompts before writing to:
+- Shell startup files (`.zshenv`, `.zlogin`, `.bash_login`)
+- Git config (`~/.config/git/`)
+- Build-tool config files (`.npmrc`, `.yarnrc*`, `bunfig.toml`, `.bazelrc`, `.pre-commit-config.yaml`, `.devcontainer/`)
+
+These prompts apply in `acceptEdits` mode and prevent unintended command execution. Hooks that attempt writes to these paths will trigger user confirmation before proceeding.
+
 ### the five types
 
 | type | what it is | timeout | cost | best for |

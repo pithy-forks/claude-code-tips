@@ -51,6 +51,12 @@ good: "the bug is in src/auth/token.ts around line 140, the JWT expiry check"
 
 ## five strategies that work
 
+
+
+### 6. use single-file grep reads efficiently
+
+v2.1.160 removed the read-after-grep requirement for single-file `grep`/`egrep`/`fgrep` commands. if claude greps a single file to understand it before editing, that single grep now satisfies the read-before-edit check. this saves a separate Read call and keeps context tighter.
+
 ### 1. scope before you start
 
 "implement the auth module" is a 2hr session. "add the JWT validation middleware" is 15 min. the tighter your scope, the less context you burn and the lower your compaction risk.
