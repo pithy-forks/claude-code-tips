@@ -53,6 +53,12 @@ PreToolUse hooks (safety-guard, no-squash) fire on every Bash call -- 10K+ times
 
 
 
+
+
+### safety prompts for sensitive file writes (v2.1.160+)
+
+v2.1.160 added confirmation prompts before writing to shell startup files (`.zshenv`, `.zlogin`, `.bash_login`), git config (`~/.config/git/`), and build-tool config files (`.npmrc`, `.yarnrc*`, `bunfig.toml`, `.bazelrc`, `.pre-commit-config.yaml`, `.devcontainer/`). these prompts apply in `acceptEdits` mode and provide a second safety layer alongside safety-guard.sh hooks.
+
 ### hook performance notes (v2.1.140+)
 PreToolUse hooks on Bash commands need to complete in <50ms to avoid user-facing latency. the hooks listed above are optimized for speed -- they use jq for JSON parsing and regex for pattern matching rather than spawning subprocesses. profile your custom hooks with `time` if you add new ones.
 

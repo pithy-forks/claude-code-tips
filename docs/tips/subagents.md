@@ -40,6 +40,25 @@ use worktree isolation for:
 
 skip it for read-only research. worktree setup adds overhead you don't need when the agent is just reading files.
 
+
+
+### worktree cloning with skipLfs (v2.1.153+)
+
+when spawning agents with `isolation: "worktree"`, large repos with git lfs files can be slow to clone. set `skipLfs: true` in your agent config to skip lfs downloads:
+
+```json
+{
+  "prompt": "refactor src/api/handlers.ts",
+  "description": "refactor api handlers",
+  "isolation": "worktree",
+  "gitConfig": {
+    "skipLfs": true
+  }
+}
+```
+
+this speeds up worktree creation for repos with large binary assets.
+
 ## the scout pattern
 
 send a cheap model to explore, then a capable model to act. each subagent is its own billing stream, so model choice matters.
