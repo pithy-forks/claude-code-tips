@@ -205,3 +205,9 @@ i've never hit a rate limit on max. on pro, i'd have been throttled in the first
 ### session resumption improvements (v2.1.132+)
 
 v2.1.132 fixed `--resume` failing when emoji splits in tool error truncation and now sanitizes pre-corrupted sessions on load. this means longer sessions with more tool errors are now more reliable to resume, reducing context loss on recovery.
+
+---
+
+### note on version-specific cost dynamics
+
+monitor (v2.1.98+) changed cost models for background process watching. if you're on v2.1.163+, verify monitor performance and cost metrics haven't shifted. /lore track record may have evolved.

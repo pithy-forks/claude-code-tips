@@ -325,3 +325,9 @@ start with a command hook on PreToolUse. safety-guard.sh in this repo is a good 
 3. always set a specific matcher. `"Bash"` is better than matching everything.
 
 [full hooks guide &rarr;](../hooks.md) | [hook scripts &rarr;](../../hooks/)
+
+---
+
+### v2.1.163 changes to hook event data
+
+v2.1.163+ may include additional event context for hooks. verify your hook inputs if upgrading from v2.1.122. check `/doctor` for hook compatibility warnings.
