@@ -163,9 +163,9 @@ it doesn't block anything. just awareness. knowing you're on an expensive sessio
 the lore plugin logs every session to sqlite at `~/.claude/lore/lore.db`. tracks input tokens, output tokens, cache creation, cache read -- per session, per model, per project.
 
 ```
-/lore                          # daily dashboard
-/lore intent: cost this month  # monthly spend breakdown
-/lore intent: cache efficiency # cache hit rate analysis
+/lore                       # daily dashboard
+/lore search "token cost"   # search for cost-related sessions
+/lore hotspots              # files with highest edit frequency
 ```
 
 ---
