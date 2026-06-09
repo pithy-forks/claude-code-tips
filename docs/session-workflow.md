@@ -18,6 +18,18 @@ by the time you see the prompt, hooks are loaded, context is cached, and claude 
 
 if you see a notice about npm global install not auto-updating, run `/doctor` to see the fix. this was added in v2.1.153 to help diagnose update issues.
 
+
+
+### safe mode (v2.1.169+)
+
+if claude code misbehaves or you suspect a hook/plugin is causing issues, start with `--safe-mode` to disable all customizations:
+
+```bash
+claude --safe-mode
+```
+
+this disables CLAUDE.md, plugins, skills, hooks, and MCP servers for the session. useful for troubleshooting or running in a clean state.
+
 ## context loading
 
 three things work together on startup:
@@ -55,6 +67,18 @@ when a session ends (ctrl+c, `/exit`, or timeout), two things fire:
 **panopticon** has already logged every tool call during the session to `~/.claude/panopticon.db`.
 
 nothing to do manually. close the terminal. the data is there when you need it.
+
+
+
+### changing directories mid-session (v2.1.169+)
+
+use `/cd <path>` to move your session to a new working directory without breaking the prompt cache:
+
+```
+/cd ../another-project
+```
+
+this preserves your conversation context and cache prefix while changing the directory claude works in. useful for switching between related tasks in sibling directories.
 
 ## further reading
 

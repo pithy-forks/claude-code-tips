@@ -94,6 +94,12 @@ exit 0
 
 use this to warn before stopping a session with active background work, or to log task completion state.
 
+
+
+### safe mode disables hooks (v2.1.169+)
+
+starting claude code with `--safe-mode` disables all hooks, plugins, skills, and MCP servers. this is useful for troubleshooting when customizations are causing problems. hooks will not fire during safe mode sessions.
+
 ### mcp_tool event hooks (v2.1.126+)
 
 MCP tool handlers can now be invoked from hooks using the `mcp_tool` type with event-driven logic. this lets you intercept and react to MCP calls without spinning up a shell or http process.
